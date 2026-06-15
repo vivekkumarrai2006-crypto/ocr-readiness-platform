@@ -1,0 +1,11 @@
+streamlit
+opencv-python
+pillow
+numpy
+pandas
+plotly
+reportlab
+requests
+scikit-image
+pytesseract
+streamlit-cropper
