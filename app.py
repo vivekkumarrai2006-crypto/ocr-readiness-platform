@@ -449,7 +449,7 @@ if "🏠 Analyse Image" in nav:
                         st.progress(int(min(sc, 100)))
                         st.markdown(f"<div style='text-align:center;font-size:12px;color:#6B7280;'>out of 100</div>", unsafe_allow_html=True)
 
-        with tab3:
+        with tab2:
             if ocr_conf is not None and ocr_text:
                 st.markdown(f"**Tesseract Confidence: {ocr_conf}%**")
                 st.text_area("Extracted Text", ocr_text, height=220)
@@ -459,7 +459,7 @@ if "🏠 Analyse Image" in nav:
                     "Make sure Tesseract is installed and the path is set correctly in app.py."
                 )
 
-        with tab4:
+        with tab3:
             for rec in recs:
                 is_warn = "🔧" in rec
                 box_cls = "rec-box warn" if is_warn else "rec-box"
