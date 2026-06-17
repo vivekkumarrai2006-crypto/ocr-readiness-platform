@@ -309,32 +309,26 @@ def text_density_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         "score": round(score, 1),
         "status": _classify(score),
         "description": f"Text coverage = {density_pct:.1f}% of image. "
-                       + ("Optimal text density." if score >= 70
-                          else "Text is sparse or very dense." if score >= 45
-                          else "Extremely sparse or overcrowded text region."),
+                       + ("text density too high" if score >= 70
+                          else "Text is sparse or very dense." 
+                          if score >= 45
+                          else "Extremely sparse"),
         "raw_value": round(density_pct, 2),
         "unit": "% text pixel coverage",
     }
 
-
-# ──────────────────────────────────────────────
-# KRISH — Matra Continuity Score (self-contained)
-# ──────────────────────────────────────────────
+#matra scoring
 
 def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     """
     Self-contained MCS using the same logic as the full pipeline.
-    Computes SCS (shirorekha gap penalty) and MVS (matra visibility)
-    as the two primary sub-metrics, combined into a final score.
+    Fixed for handwriting and printed Hindi text.
     """
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    
-    # Sauvola-style adaptive threshold (approximated with OTSU per block)
     _, binary = cv2.threshold(gray, 0, 255,
                               cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     h, w = binary.shape
 
-    # ── Detect text lines via horizontal projection ──────────────────
     row_sums = np.sum(binary > 0, axis=1).astype(float)
     threshold_row = row_sums.max() * 0.05
     in_band = row_sums > threshold_row
@@ -366,7 +360,6 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         if band_h < 5:
             continue
 
-        # ── Zone boundaries (Pal-Chaudhuri model) ───────────────────
         shiro_top    = r0
         shiro_bottom = r0 + max(1, int(band_h * 0.15))
         upper_top    = r0
@@ -386,7 +379,8 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         if shiro_zone.size > 0:
             col_ink = shiro_zone.sum(axis=0)
             zone_h  = shiro_zone.shape[0]
-            active  = col_ink >= max(1, int(zone_h * 0.30) * 255)
+            # FIX 1: relaxed threshold 0.30 → 0.15
+            active  = col_ink >= max(1, int(zone_h * 0.15) * 255)
 
             max_gap = 0
             current_gap = 0
@@ -396,12 +390,13 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
                     max_gap = max(max_gap, current_gap)
                 else:
                     current_gap = 0
-
-            gap_threshold = 3
+            # Dynamic gap threshold based on image width
+            gap_threshold = max(20, int(w * 0.02))  # 2% of image width
             if max_gap <= gap_threshold:
                 scs = 100.0
             else:
-                penalty = min(100.0, (max_gap - gap_threshold) * 5.0)
+                # FIX 2: softer penalty 5.0 → 2.0
+                penalty = min(100.0, (max_gap - gap_threshold) * 2.0)
                 scs = max(0.0, 100.0 - penalty)
         else:
             scs = 50.0
@@ -413,13 +408,13 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             n, _, stats, _ = cv2.connectedComponentsWithStats(
                 zone, connectivity=8)
             if n <= 1:
-                return 0.0
+                return 100.0  # FIX 3: clean zone not a failure
             min_area = 4
             valid = sum(1 for i in range(1, n)
                         if stats[i, cv2.CC_STAT_AREA] >= min_area)
             total = n - 1
             if total == 0:
-                return 0.0
+                return 100.0  # FIX 3: clean zone not a failure
             return float(np.clip((valid / total) * 100, 0, 100))
 
         mvs_upper = mvs(upper_zone)
@@ -446,8 +441,8 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             runs_arr = np.array(runs, dtype=np.float32)
             mean_r = runs_arr.mean()
             if mean_r > 0:
-                cov = runs_arr.std() / mean_r
-                rlr = float(np.clip(100.0 * np.exp(-cov), 0, 100))
+                    cov = runs_arr.std() / mean_r
+                    rlr = float(np.clip(100.0 * np.exp(-cov * 0.5), 0, 100))
             else:
                 rlr = 0.0
         else:
@@ -460,7 +455,8 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             row_idx = np.arange(middle_zone.shape[0], dtype=np.float32)
             coms = (ink * row_idx[:, None]).sum(axis=0) / col_sum
             var = float(coms.var())
-            bs = float(np.clip(100.0 * np.exp(-var / 5.0), 0, 100))
+            # FIX 4: relaxed variance max 5.0 → 30.0
+            bs = float(np.clip(100.0 * np.exp(-var / 30.0), 0, 100))
         else:
             bs = 50.0
 
@@ -469,7 +465,7 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             full_line, connectivity=8)
         if n_cc > 1:
             noise_count = sum(1 for i in range(1, n_cc)
-                              if stats_ns[i, cv2.CC_STAT_AREA] <= 6)
+                              if stats_ns[i, cv2.CC_STAT_AREA] <= 12)
             ns = float(np.clip(
                 100.0 * (1.0 - noise_count / max(1, n_cc - 1)), 0, 100))
         else:
@@ -489,24 +485,24 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
                 angles.append(
                     math.degrees(math.atan2(y2 - y1, x2 - x1)))
             std = float(np.array(angles).std())
-            ss = float(np.clip(100.0 * np.exp(-std / 5.0), 0, 100))
+            # FIX 5: relaxed angle std 5.0 → 10.0
+            ss = float(np.clip(100.0 * np.exp(-std / 10.0), 0, 100))
         else:
             ss = 50.0
 
-        # ── MCS formula ──────────────────────────────────────────────
-        line_mcs = (0.28 * scs +
-                    0.22 * mvs_upper +
-                    0.18 * rlr +
-                    0.12 * mvs_lower +
-                    0.10 * bs +
-                    0.06 * ns +
-                    0.04 * ss)
+        # ── MCS formula — rebalanced weights ─────────────────────────
+        line_mcs = (0.22 * scs +
+            0.28 * mvs_upper +  # ← increased
+            0.10 * rlr +        # ← reduced significantly
+            0.18 * mvs_lower +  # ← increased
+            0.12 * bs +
+            0.06 * ns +
+            0.04 * ss)
         band_scores.append(float(np.clip(line_mcs, 0, 100)))
 
     if not band_scores:
         score = 50.0
     else:
-        # Height-weighted mean
         score = float(np.mean(band_scores))
         score = float(np.clip(score, 0, 100))
 
@@ -534,6 +530,7 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     Self-contained ZIS using the same logic as the full pipeline.
     Scores each Devanagari zone (upper, shiro, middle, lower) on
     FRAG, STROKE, FILL, SHARP and combines with Pal-Chaudhuri weights.
+    Fixed: nan guards, division by zero protection.
     """
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, 0, 255,
@@ -542,6 +539,16 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
 
     # ── Detect text lines ────────────────────────────────────────────
     row_sums = np.sum(binary > 0, axis=1).astype(float)
+    if row_sums.max() == 0:
+        return {
+            "factor_name": "zone_integrity_score",
+            "score": 50.0,
+            "status": "Average",
+            "description": "No ink detected in image.",
+            "raw_value": 0,
+            "unit": "ZIS (0-100)",
+        }
+
     threshold_row = row_sums.max() * 0.05
     in_band = row_sums > threshold_row
 
@@ -568,61 +575,87 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
 
     # ── Zone scoring functions ───────────────────────────────────────
     def frag_score(patch):
-        if patch.size == 0:
+        if patch is None or patch.size == 0:
             return 50.0
-        n, _, stats, _ = cv2.connectedComponentsWithStats(
-            patch, connectivity=8)
-        valid = [i for i in range(1, n)
-                 if stats[i, cv2.CC_STAT_AREA] >= 3]
-        if not valid:
-            return 0.0
-        total_ink = sum(stats[i, cv2.CC_STAT_AREA] for i in valid)
-        mean_cc = total_ink / len(valid)
-        rel = mean_cc / patch.size
-        return float(np.clip(rel * 10000, 0, 100))
+        try:
+            n, _, stats, _ = cv2.connectedComponentsWithStats(
+                patch, connectivity=8)
+            valid = [i for i in range(1, n)
+                     if stats[i, cv2.CC_STAT_AREA] >= 3]
+            if not valid:
+                return 50.0  # FIX: neutral not 0
+            total_ink = sum(stats[i, cv2.CC_STAT_AREA] for i in valid)
+            mean_cc = total_ink / max(1, len(valid))
+            rel = mean_cc / max(1, patch.size)  # FIX: avoid /0
+            result = float(np.clip(rel * 10000, 0, 100))
+            return result if not np.isnan(result) else 50.0
+        except Exception:
+            return 50.0
 
     def stroke_score(patch):
-        if patch.size == 0:
+        if patch is None or patch.size == 0:
             return 50.0
-        if patch.sum() == 0:
-            return 0.0
-        dist = cv2.distanceTransform(patch, cv2.DIST_L2, 5)
-        vals = dist[dist > 0]
-        if len(vals) < 5:
+        try:
+            if patch.sum() == 0:
+                return 50.0  # FIX: no ink = neutral
+            dist = cv2.distanceTransform(patch, cv2.DIST_L2, 5)
+            vals = dist[dist > 0]
+            if len(vals) < 5:
+                return 50.0
+            mean_val = float(vals.mean())
+            if mean_val == 0:
+                return 50.0  # FIX: avoid /0
+            cov = float(vals.std() / mean_val)
+            if cov <= 0.4:
+                return 100.0
+            excess = cov - 0.4
+            result = float(np.clip(100.0 * np.exp(-excess * 3), 0, 100))
+            return result if not np.isnan(result) else 50.0
+        except Exception:
             return 50.0
-        cov = float(vals.std() / (vals.mean() + 1e-6))
-        if cov <= 0.4:
-            return 100.0
-        excess = cov - 0.4
-        return float(np.clip(100.0 * np.exp(-excess * 3), 0, 100))
 
     def fill_score(patch):
-        if patch.size == 0:
+        if patch is None or patch.size == 0:
             return 50.0
-        ratio = float(np.count_nonzero(patch)) / patch.size
-        lo, hi = 0.05, 0.70
-        if ratio < lo:
-            return float(np.clip((ratio / lo) * 100, 0, 100))
-        elif ratio > hi:
-            excess = (ratio - hi) / (1.0 - hi + 1e-6)
-            return float(np.clip(100.0 * (1.0 - excess), 0, 100))
-        return 100.0
+        try:
+            ratio = float(np.count_nonzero(patch)) / max(1, patch.size)  # FIX
+            lo, hi = 0.05, 0.70
+            if ratio < lo:
+                result = float(np.clip((ratio / lo) * 100, 0, 100))
+            elif ratio > hi:
+                excess = (ratio - hi) / (1.0 - hi + 1e-6)
+                result = float(np.clip(100.0 * (1.0 - excess), 0, 100))
+            else:
+                result = 100.0
+            return result if not np.isnan(result) else 50.0
+        except Exception:
+            return 50.0
 
     def sharp_score(patch):
-        if patch.size == 0:
+        if patch is None or patch.size == 0:
             return 50.0
-        lap = cv2.Laplacian(patch.astype(np.float32), cv2.CV_32F)
-        energy = float((lap ** 2).mean())
-        return float(np.clip(
-            100.0 * (1.0 - np.exp(-energy / 50.0)), 0, 100))
+        try:
+            lap = cv2.Laplacian(patch.astype(np.float32), cv2.CV_32F)
+            energy = float((lap ** 2).mean())
+            if np.isnan(energy) or np.isinf(energy):
+                return 50.0  # FIX: guard nan/inf
+            result = float(np.clip(
+                100.0 * (1.0 - np.exp(-energy / 50.0)), 0, 100))
+            return result if not np.isnan(result) else 50.0
+        except Exception:
+            return 50.0
 
     def zone_score(patch):
-        f = frag_score(patch)
-        s = stroke_score(patch)
-        fi = fill_score(patch)
-        sh = sharp_score(patch)
-        total = (0.35*f + 0.25*s + 0.20*fi + 0.20*sh)
-        return float(np.clip(total, 0, 100))
+        try:
+            f  = frag_score(patch)
+            s  = stroke_score(patch)
+            fi = fill_score(patch)
+            sh = sharp_score(patch)
+            total = (0.35 * f + 0.25 * s + 0.20 * fi + 0.20 * sh)
+            result = float(np.clip(total, 0, 100))
+            return result if not np.isnan(result) else 50.0
+        except Exception:
+            return 50.0
 
     # ── Per-line ZIS ─────────────────────────────────────────────────
     line_scores = []
@@ -631,33 +664,54 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         if band_h < 5:
             continue
 
-        upper_patch  = binary[r0: r0 + max(1, int(band_h * 0.20)), :]
-        shiro_patch  = binary[r0 + max(1, int(band_h * 0.20)):
-                               r0 + max(1, int(band_h * 0.35)), :]
-        middle_patch = binary[r0 + max(1, int(band_h * 0.35)):
-                               r0 + max(1, int(band_h * 0.75)), :]
-        lower_patch  = binary[r0 + max(1, int(band_h * 0.75)): r1, :]
+        try:
+            upper_patch  = binary[r0: r0 + max(1, int(band_h * 0.20)), :]
+            shiro_patch  = binary[r0 + max(1, int(band_h * 0.20)):
+                                   r0 + max(1, int(band_h * 0.35)), :]
+            middle_patch = binary[r0 + max(1, int(band_h * 0.35)):
+                                   r0 + max(1, int(band_h * 0.75)), :]
+            lower_patch  = binary[r0 + max(1, int(band_h * 0.75)): r1, :]
 
-        zs_upper  = zone_score(upper_patch)
-        zs_shiro  = zone_score(shiro_patch)
-        zs_middle = zone_score(middle_patch)
-        zs_lower  = zone_score(lower_patch)
+            zs_upper  = zone_score(upper_patch)
+            zs_shiro  = zone_score(shiro_patch)
+            zs_middle = zone_score(middle_patch)
+            zs_lower  = zone_score(lower_patch)
 
-        # Final ZIS formula with Pal-Chaudhuri weights
-        zis = (0.40 * zs_shiro +
-               0.30 * zs_middle +
-               0.20 * zs_upper +
-               0.10 * zs_lower)
-        line_scores.append(float(np.clip(zis, 0, 100)))
+            # Final ZIS with Pal-Chaudhuri weights
+            zis = (0.40 * zs_shiro +
+                   0.30 * zs_middle +
+                   0.20 * zs_upper +
+                   0.10 * zs_lower)
 
+            zis = float(np.clip(zis, 0, 100))
+
+            # FIX: only append valid scores
+            if not np.isnan(zis) and not np.isinf(zis):
+                line_scores.append(zis)
+
+        except Exception:
+            continue
+
+    # ── Final score ──────────────────────────────────────────────────
     if not line_scores:
         score = 50.0
     else:
-        score = float(np.mean(line_scores))
-        score = float(np.clip(score, 0, 100))
+        # FIX: filter nan before averaging
+        valid_scores = [s for s in line_scores
+                        if not np.isnan(s) and not np.isinf(s)]
+        if not valid_scores:
+            score = 50.0
+        else:
+            score = float(np.mean(valid_scores))
+            score = float(np.clip(score, 0, 100))
+
+    # Final nan guard
+    if np.isnan(score) or np.isinf(score):
+        score = 50.0
 
     status = ("Excellent" if score >= 81 else "Good" if score >= 61
               else "Average" if score >= 41 else "Poor")
+
     return {
         "factor_name": "zone_integrity_score",
         "score": round(score, 1),
