@@ -5,6 +5,7 @@ Run: streamlit run app.py
 """
 
 import sys, os
+import shutil
 sys.path.insert(0, os.path.dirname(__file__))
 
 if sys.platform.startswith("win"):
@@ -29,10 +30,41 @@ from config_manager import load_config, save_config, build_urls, PORTS, ENDPOINT
 
 try:
     import pytesseract
-    # ── SET YOUR TESSERACT PATH HERE ──────────────────────────────────────
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-    # ─────────────────────────────────────────────────────────────────────
-    TESSERACT_OK = True
+    def _find_tesseract_cmd():
+        env_cmd = os.environ.get("TESSERACT_CMD")
+        if env_cmd and os.path.isfile(env_cmd):
+            return env_cmd
+
+        path_cmd = shutil.which("tesseract")
+        if path_cmd:
+            return path_cmd
+
+        program_files = [
+            os.environ.get("ProgramFiles"),
+            os.environ.get("ProgramFiles(x86)"),
+            os.environ.get("LocalAppData"),
+        ]
+        candidates = [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            r"C:\Users\Yash Rajput\AppData\Local\Programs\Tesseract-OCR\tesseract.exe",
+        ]
+        for base_dir in program_files:
+            if base_dir:
+                candidates.append(os.path.join(base_dir, "Tesseract-OCR", "tesseract.exe"))
+                candidates.append(os.path.join(base_dir, "Programs", "Tesseract-OCR", "tesseract.exe"))
+
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return candidate
+        return None
+
+    tesseract_cmd = _find_tesseract_cmd()
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+        TESSERACT_OK = True
+    else:
+        TESSERACT_OK = False
 except ImportError:
     TESSERACT_OK = False
 
@@ -135,7 +167,14 @@ def run_tesseract(img):
         return None, None
     try:
         data  = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-        confs = [c for c in data["conf"] if isinstance(c,(int,float)) and c >= 0]
+        confs = []
+        for c in data.get("conf", []):
+            try:
+                conf = float(c)
+            except (TypeError, ValueError):
+                continue
+            if conf >= 0:
+                confs.append(conf)
         if confs:
             return round(float(np.mean(confs)),1), pytesseract.image_to_string(img)
         return None, None

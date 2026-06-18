@@ -12,20 +12,14 @@ pip install -r requirements.txt
 ```
 
 ### Step 2 — Set Tesseract path
-Open `app.py` and find this section near the top (after imports):
+No manual path setup is required now.
 
-```python
-# ── TESSERACT PATH — update this to your installation ──
-# import pytesseract
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-```
+The app automatically looks for Tesseract in:
+1. Your `PATH`
+2. Common Windows install folders
+3. The `TESSERACT_CMD` environment variable, if you want to override it
 
-Uncomment those 2 lines and set the correct path.
-Find your path by running in terminal:
-```
-where tesseract        # Windows
-which tesseract        # Mac / Linux
-```
+If Tesseract is not found, install it and make sure `tesseract.exe` is available from one of those locations.
 
 ### Step 3 — Start team APIs
 Make sure your teammates have their APIs running:
