@@ -72,23 +72,44 @@ def noise_score(img_bgr: np.ndarray) -> Dict[str, Any]:
 
 def resolution_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     """
-    Evaluates pixel dimensions for OCR suitability.
-    OCR works best at ≥300 DPI equivalent; heuristic: images ≥1500px
-    on the long side score 100, images <200px score 0.
-    Score = clamp((long_side − 200) / 13, 0, 100)
+    Evaluates image resolution for OCR suitability.
+
+    Assumption:
+        OCR quality improves as image dimensions increase.
+
+    Heuristic:
+        Long side <= 300 px   -> unusable
+        Long side >= 2000 px  -> excellent
+
+    Score is linearly normalized between these limits.
     """
+
     h, w = img_bgr.shape[:2]
+
     long_side = max(h, w)
-    score = _clamp((long_side - 200) / 13.0)
+
     mp = (h * w) / 1_000_000
+
+    min_px = 300
+    max_px = 2000
+
+    score = _clamp(
+        100.0 * (long_side - min_px) / (max_px - min_px)
+    )
+
     return {
         "factor_name": "resolution_score",
         "score": round(score, 1),
         "status": _classify(score),
-        "description": f"{w}×{h} px ({mp:.2f} MP). "
-                       + ("High resolution — text should be sharp." if score >= 70
-                          else "Moderate resolution." if score >= 45
-                          else "Low resolution — capture at higher DPI."),
+        "description":
+            f"{w}×{h} px ({mp:.2f} MP). "
+            + (
+                "High resolution — text should be sharp."
+                if score >= 70 else
+                "Moderate resolution."
+                if score >= 45 else
+                "Low resolution — capture at higher DPI."
+            ),
         "raw_value": long_side,
         "unit": "px (long side)",
     }
@@ -157,7 +178,7 @@ def contrast_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         "score": round(float(score), 1),
         "status": _classify(score),
         "description": (
-            f"Contrast difference = {contrast:.1f}. "
+            f"Contrast differdence = {contrast:.1f}. "
             + (
                 "Text and background are clearly separated."
                 if score >= 75 else
