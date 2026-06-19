@@ -5,7 +5,12 @@ Run: streamlit run app.py
 """
 
 import sys, os
+import shutil
 sys.path.insert(0, os.path.dirname(__file__))
+
+if sys.platform.startswith("win"):
+    import asyncio
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 import numpy as np
 import pandas as pd
@@ -25,10 +30,41 @@ from config_manager import load_config, save_config, build_urls, PORTS, ENDPOINT
 
 try:
     import pytesseract
-    # ── SET YOUR TESSERACT PATH HERE ──────────────────────────────────────
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-    # ─────────────────────────────────────────────────────────────────────
-    TESSERACT_OK = True
+    def _find_tesseract_cmd():
+        env_cmd = os.environ.get("TESSERACT_CMD")
+        if env_cmd and os.path.isfile(env_cmd):
+            return env_cmd
+
+        path_cmd = shutil.which("tesseract")
+        if path_cmd:
+            return path_cmd
+
+        program_files = [
+            os.environ.get("ProgramFiles"),
+            os.environ.get("ProgramFiles(x86)"),
+            os.environ.get("LocalAppData"),
+        ]
+        candidates = [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            r"C:\Users\Yash Rajput\AppData\Local\Programs\Tesseract-OCR\tesseract.exe",
+        ]
+        for base_dir in program_files:
+            if base_dir:
+                candidates.append(os.path.join(base_dir, "Tesseract-OCR", "tesseract.exe"))
+                candidates.append(os.path.join(base_dir, "Programs", "Tesseract-OCR", "tesseract.exe"))
+
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return candidate
+        return None
+
+    tesseract_cmd = _find_tesseract_cmd()
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+        TESSERACT_OK = True
+    else:
+        TESSERACT_OK = False
 except ImportError:
     TESSERACT_OK = False
 
@@ -131,7 +167,14 @@ def run_tesseract(img):
         return None, None
     try:
         data  = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-        confs = [c for c in data["conf"] if isinstance(c,(int,float)) and c >= 0]
+        confs = []
+        for c in data.get("conf", []):
+            try:
+                conf = float(c)
+            except (TypeError, ValueError):
+                continue
+            if conf >= 0:
+                confs.append(conf)
         if confs:
             return round(float(np.mean(confs)),1), pytesseract.image_to_string(img)
         return None, None
@@ -186,7 +229,7 @@ with st.sidebar:
             f'<span style="color:#A8B8D0;font-size:12px;">/ 100</span>',
             unsafe_allow_html=True)
         st.caption(f"📄 {st.session_state.image_name}")
-        if st.button("🗑️ Clear Analysis", use_container_width=True):
+        if st.button("🗑️ Clear Analysis", width="stretch"):
             for key in ["analysis_done","final_results","api_status",
                         "ocr_conf","ocr_text","image_name","raw_pil","analysis_img","recs"]:
                 st.session_state[key] = False if key=="analysis_done" else ({} if "results" in key or "status" in key else (None if key in ["ocr_conf","raw_pil","analysis_img"] else ([] if key=="recs" else "")))
@@ -241,7 +284,7 @@ if "🏠 Analyse Image" in nav:
             )
             col_prev, col_info = st.columns([2,1])
             with col_prev:
-                st.image(cropped, caption="Selected crop region", use_container_width=True)
+                st.image(cropped, caption="Selected crop region", width="stretch")
             with col_info:
                 w, h = cropped.size
                 st.metric("Width", f"{w} px")
@@ -251,7 +294,7 @@ if "🏠 Analyse Image" in nav:
             st.warning("streamlit-cropper not installed. Using slider crop instead.")
             c1, c2 = st.columns(2)
             with c1:
-                st.image(raw_pil, caption="Original Image", use_container_width=True)
+                st.image(raw_pil, caption="Original Image", width="stretch")
             with c2:
                 w, h = raw_pil.size
                 left   = st.slider("Left",   0, w-1, 0)
@@ -261,10 +304,10 @@ if "🏠 Analyse Image" in nav:
                 if right  <= left:  right  = left  + 1
                 if bottom <= top:   bottom = top   + 1
                 cropped = raw_pil.crop((left, top, right, bottom))
-                st.image(cropped, caption="Cropped Region", use_container_width=True)
+                st.image(cropped, caption="Cropped Region", width="stretch")
             st.session_state.analysis_img = cropped
     else:
-        st.image(raw_pil, caption="Full image — will be analysed", use_container_width=True)
+        st.image(raw_pil, caption="Full image — will be analysed", width="stretch")
         st.session_state.analysis_img = raw_pil
 
     analysis_img = st.session_state.analysis_img
@@ -276,7 +319,7 @@ if "🏠 Analyse Image" in nav:
         value=True,
     )
 
-    if st.button("🚀 Analyse Image", type="primary", use_container_width=True):
+    if st.button("🚀 Analyse Image", type="primary", width="stretch"):
 
         bgr = pil_to_bgr(analysis_img)
 
@@ -478,7 +521,7 @@ if "🏠 Analyse Image" in nav:
             data=pdf_bytes,
             file_name=f"ocr_report_{image_name.rsplit('.',1)[0]}.pdf",
             mime="application/pdf",
-            use_container_width=True,
+            width="stretch",
         )
 
 
@@ -499,7 +542,7 @@ elif "📊 History" in nav:
         st.stop()
 
     st.markdown(f"**{len(df)} analyses stored in results.csv**")
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df, width="stretch")
 
     csv_bytes = df.to_csv(index=False).encode()
     st.download_button("⬇️ Download CSV", csv_bytes, "results.csv", "text/csv")
@@ -524,7 +567,7 @@ elif "📊 History" in nav:
             height=400,
             paper_bgcolor="rgba(0,0,0,0)",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         st.caption("Closer to +1.0 means the factor is a stronger positive predictor of OCR accuracy.")
 
         corr_df = pd.DataFrame({
@@ -533,7 +576,7 @@ elif "📊 History" in nav:
             "Strength":    ["Strong" if abs(v)>0.7 else "Moderate" if abs(v)>0.4 else "Weak"
                             for v in corr.values],
         })
-        st.dataframe(corr_df, use_container_width=True, hide_index=True)
+        st.dataframe(corr_df, width="stretch", hide_index=True)
 
 
 # ════════════════════════════════════════════════
@@ -581,7 +624,7 @@ elif "📖 About" in nav:
         "Weight":      f"{int(WEIGHTS[k]*100)}%",
         "Ideal Range": v["ideal_range"].split(".")[0],
     } for k,v in FACTOR_INFO.items()]
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
 # ════════════════════════════════════════════════
@@ -609,7 +652,7 @@ elif "🔌 API Status" in nav:
         {"Member":"Yash",    "Factors":"Noise, Resolution",
          "URL":"Local (built-in)", "Method":"—", "Field":"—", "Port":"—"},
     ])
-    st.dataframe(api_map, use_container_width=True, hide_index=True)
+    st.dataframe(api_map, width="stretch", hide_index=True)
 
     st.markdown("---")
     st.markdown("### Live Connectivity Check")
@@ -707,7 +750,7 @@ elif "⚙️ Settings" in nav:
     for name, url in preview.items():
         st.code(f"{name.capitalize()}: {url}")
 
-    if st.button("💾 Save IP Addresses", type="primary", use_container_width=True):
+    if st.button("💾 Save IP Addresses", type="primary", width="stretch"):
         new_cfg = {
             "vivek_ip":   vivek_ip.strip(),
             "mansi_ip":   mansi_ip.strip(),
@@ -719,7 +762,7 @@ elif "⚙️ Settings" in nav:
 
     st.markdown("---")
     st.markdown("### Test Connections after Saving")
-    if st.button("🔄 Test All Connections Now", use_container_width=True):
+    if st.button("🔄 Test All Connections Now", width="stretch"):
         import requests as req
         saved_urls = get_current_urls()
         for name, url in saved_urls.items():
