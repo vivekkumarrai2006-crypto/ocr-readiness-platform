@@ -59,6 +59,33 @@ try:
                 return candidate
         return None
 
+    def _find_tessdata_prefix():
+        env_prefix = os.environ.get("TESSDATA_PREFIX")
+        candidates = [env_prefix] if env_prefix else []
+        candidates.extend([
+            "C:\\Program Files\\Tesseract-OCR\\",
+            "C:\\Program Files\\tessdata\\",
+            "C:\\Program Files (x86)\\Tesseract-OCR\\",
+            "C:\\Program Files (x86)\\tessdata\\",
+        ])
+
+        for candidate in candidates:
+            if not candidate:
+                continue
+            normalized = os.path.normpath(candidate)
+            if os.path.isfile(os.path.join(normalized, "tessdata", "hin.traineddata")):
+                return os.path.join(normalized, "tessdata")
+            if os.path.isfile(os.path.join(normalized, "hin.traineddata")):
+                return normalized
+        return None
+
+    TESSDATA_PREFIX = _find_tessdata_prefix()
+    if TESSDATA_PREFIX:
+        os.environ["TESSDATA_PREFIX"] = TESSDATA_PREFIX
+        OCR_LANG = "hin+eng"
+    else:
+        OCR_LANG = "eng"
+
     tesseract_cmd = _find_tesseract_cmd()
     if tesseract_cmd:
         pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
@@ -166,11 +193,10 @@ def run_tesseract(img):
     if not TESSERACT_OK:
         return None, None
     try:
-        # FIX: added lang='hin+eng' for Hindi support
         data = pytesseract.image_to_data(
             img,
-            lang='hin+eng',
-            output_type=pytesseract.Output.DICT
+            lang=OCR_LANG,
+            output_type=pytesseract.Output.DICT,
         )
         confs = []
         for c in data.get("conf", []):
@@ -181,8 +207,7 @@ def run_tesseract(img):
             if conf >= 0:
                 confs.append(conf)
         if confs:
-            # FIX: added lang='hin+eng' here too
-            return round(float(np.mean(confs)), 1), pytesseract.image_to_string(img, lang='hin+eng')
+            return round(float(np.mean(confs)), 1), pytesseract.image_to_string(img, lang=OCR_LANG)
         return None, None
     except Exception as e:
         return None, None
