@@ -166,7 +166,12 @@ def run_tesseract(img):
     if not TESSERACT_OK:
         return None, None
     try:
-        data  = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+        # FIX: added lang='hin+eng' for Hindi support
+        data = pytesseract.image_to_data(
+            img,
+            lang='hin+eng',
+            output_type=pytesseract.Output.DICT
+        )
         confs = []
         for c in data.get("conf", []):
             try:
@@ -176,9 +181,10 @@ def run_tesseract(img):
             if conf >= 0:
                 confs.append(conf)
         if confs:
-            return round(float(np.mean(confs)),1), pytesseract.image_to_string(img)
+            # FIX: added lang='hin+eng' here too
+            return round(float(np.mean(confs)), 1), pytesseract.image_to_string(img, lang='hin+eng')
         return None, None
-    except Exception:
+    except Exception as e:
         return None, None
 
 # ── Session state init ────────────────────────────────────────────────────────
