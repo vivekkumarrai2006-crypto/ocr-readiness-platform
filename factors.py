@@ -114,70 +114,127 @@ def resolution_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         "unit": "px (long side)",
     }
 
+def _classify(score: float) -> str:
+    """
+    OCR quality classification
+    """
+    if score >= 70:
+        return "Good"
+    elif score >= 35:
+        return "Moderate"
+    else:
+        return "Poor"
+
 
 # ──────────────────────────────────────────────
-# MANSI —  Blur Score 
+# Blur Score (OCR calibrated)
 # ──────────────────────────────────────────────
 def blur_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     """
-    Calculate text sharpness using Laplacian variance.
-    Works for document, line, or word images.
+    Measure text sharpness using Laplacian variance.
+    Higher score = sharper text.
     """
 
-    if len(img_bgr.shape) == 3:
+    if img_bgr is None or img_bgr.size == 0:
+        return {
+            "factor_name": "blur_score",
+            "score": 0,
+            "status": "Poor",
+            "description": "No image data available.",
+            "raw_value": 0,
+            "unit": "Laplacian variance"
+        }
+
+    # Convert to grayscale
+    if img_bgr.ndim == 3:
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     else:
-        gray = img_bgr
+        gray = img_bgr.copy()
 
-    # Edge sharpness
-    lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+    # Slight denoising to avoid noise creating fake edges
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
-    # Normalize to 0-100
-    score = min((lap_var / 300) * 100, 100)
+    # Calculate edge strength
+    lap_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+
+    # Better scaling for documents
+    # 0–20   : very blurry
+    # 20–100 : moderate blur
+    # 100+   : sharp text
+    score = (
+        (np.log1p(lap_var) - np.log1p(3)) /
+        (np.log1p(600) - np.log1p(3))
+    ) * 100
+
+    score = float(np.clip(score, 0, 100))
 
     return {
         "factor_name": "blur_score",
-        "score": round(float(score), 1),
+        "score": round(score, 1),
         "status": _classify(score),
         "description": (
-            f"Sharpness value = {lap_var:.1f}. "
-            + (
-                "Text is sharp and clear."
-                if score >= 75 else
-                "Slight blur detected."
-                if score >= 45 else
-                "Image is blurry and may affect OCR."
+            f"Laplacian variance = {lap_var:.2f}. " +
+            (
+                "Text edges are sharp and OCR readability is high."
+                if score >= 70 else
+                "Some blur is present. OCR may have minor errors."
+                if score >= 35 else
+                "Heavy blur detected. OCR accuracy may be poor."
             )
         ),
-        "raw_value": round(float(lap_var), 2),
+        "raw_value": round(lap_var, 2),
         "unit": "Laplacian variance"
     }
 
+
+# ──────────────────────────────────────────────
+# Contrast Score (OCR calibrated)
+# ──────────────────────────────────────────────
 def contrast_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     """
-    Calculate text contrast using intensity distribution.
-    Works for document and word regions.
+    Measure text and background separation.
+    Higher score = better contrast.
     """
 
-    if len(img_bgr.shape) == 3:
+    if img_bgr is None or img_bgr.size == 0:
+        return {
+            "factor_name": "contrast_score",
+            "score": 0,
+            "status": "Poor",
+            "description": "No image data available.",
+            "raw_value": 0,
+            "unit": "Intensity difference"
+        }
+
+    # Convert to grayscale
+    if img_bgr.ndim == 3:
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     else:
-        gray = img_bgr
+        gray = img_bgr.copy()
 
-    # Ignore extreme values
-    p5 = np.percentile(gray, 5)
-    p95 = np.percentile(gray, 95)
+    # Use robust intensity range
+    p5 = float(np.percentile(gray, 5))
+    p95 = float(np.percentile(gray, 95))
 
     contrast = p95 - p5
 
-    # Normalize to 0-100
-    score = min((contrast / 150) * 100, 100)
+    # Wider contrast range for scanned documents
+    # < 40  : low contrast
+    # 40-120: moderate
+    # >120  : good
+    score = (
+        (contrast - 15) /
+        (220 - 15)
+    ) * 100
+
+    score = float(np.clip(score, 0, 100))
 
     return {
         "factor_name": "contrast_score",
-        "score": round(float(score), 1),
+        "score": round(score, 1),
         "status": _classify(score),
         "description": (
+<<<<<<< HEAD
             f"Contrast differdence = {contrast:.1f}. "
             + (
                 "Text and background are clearly separated."
@@ -185,9 +242,18 @@ def contrast_score(img_bgr: np.ndarray) -> Dict[str, Any]:
                 "Moderate contrast."
                 if score >= 45 else
                 "Low contrast and OCR may fail."
+=======
+            f"Intensity difference = {contrast:.2f}. " +
+            (
+                "Strong text and background separation."
+                if score >= 70 else
+                "Moderate contrast. OCR should work with some limitations."
+                if score >= 35 else
+                "Low contrast. Text may blend into the background."
+>>>>>>> fc2422c (moderate)
             )
         ),
-        "raw_value": round(float(contrast), 2),
+        "raw_value": round(contrast, 2),
         "unit": "Intensity difference"
     }
 
