@@ -37,7 +37,7 @@ def _clamp(v: float, lo=0.0, hi=100.0) -> float:
 
 
 # ──────────────────────────────────────────────
-# YASH — Noise Score (FIXED)
+# YASH — Noise Score 
 # ──────────────────────────────────────────────
 
 def noise_score(img_bgr: np.ndarray) -> Dict[str, Any]:
