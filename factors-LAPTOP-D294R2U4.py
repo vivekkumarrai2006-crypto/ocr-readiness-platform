@@ -191,6 +191,7 @@ def contrast_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         "unit": "Intensity difference"
     }
 
+
 # ──────────────────────────────────────────────
 # VIVEK — Stroke Width Score
 # ──────────────────────────────────────────────
