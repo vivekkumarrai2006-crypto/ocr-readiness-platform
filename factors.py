@@ -37,7 +37,7 @@ def _clamp(v: float, lo=0.0, hi=100.0) -> float:
 
 
 # ──────────────────────────────────────────────
-# YASH — Noise Score 
+# YASH — Noise Score (OCR Calibrated)
 # ──────────────────────────────────────────────
 
 def noise_score(img_bgr: np.ndarray) -> Dict[str, Any]:
@@ -58,7 +58,20 @@ def noise_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     Calibration: clean scans have flat-region noise_std ~0-8;
     heavy scan/sensor noise pushes it to 15-30+.
     """
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    if img_bgr is None or img_bgr.size == 0:
+        return {
+            "factor_name": "noise_score",
+            "score": 0,
+            "status": "Poor",
+            "description": "No image data available.",
+            "raw_value": 0,
+            "unit": "Noise level"
+        }
+
+    if img_bgr.ndim == 3:
+        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    else:
+        gray = img_bgr.astype(np.float32)
 
     # Exclude text-edge regions so they aren't counted as "noise"
     edges = cv2.Canny(gray.astype(np.uint8), 50, 150)
@@ -76,6 +89,7 @@ def noise_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         noise_std = float(np.std(flat_residual))
 
     score = _clamp(100.0 - (noise_std / 0.30))
+
     return {
         "factor_name": "noise_score",
         "score": round(score, 1),
@@ -88,68 +102,70 @@ def noise_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         "unit": "σ (std of residual, flat regions only)",
     }
 
+
 # ──────────────────────────────────────────────
 # YASH — Resolution Score
 # ──────────────────────────────────────────────
 
 def resolution_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     """
-    Evaluates image resolution for OCR suitability.
+    Evaluates image resolution for OCR.
 
-    Assumption:
-        OCR quality improves as image dimensions increase.
+    Uses total image pixels (megapixels)
+    instead of only one dimension.
 
-    Heuristic:
-        Long side <= 300 px   -> unusable
-        Long side >= 2000 px  -> excellent
-
-    Score is linearly normalized between these limits.
+    Higher score = more character detail.
     """
 
-    h, w = img_bgr.shape[:2]
+    if img_bgr is None or img_bgr.size == 0:
+        return {
+            "factor_name": "resolution_score",
+            "score": 0,
+            "status": "Poor",
+            "description": "No image data available.",
+            "raw_value": 0,
+            "unit": "Megapixels"
+        }
 
-    long_side = max(h, w)
+    height, width = img_bgr.shape[:2]
+    megapixels = (height * width) / 1_000_000
 
-    mp = (h * w) / 1_000_000
+    # OCR resolution calibration
+    if megapixels >= 2.0:
+        score = 100
+    elif megapixels >= 1.0:
+        # 1–2 MP → 70–100 score
+        score = 70 + ((megapixels - 1.0) * 30)
+    elif megapixels >= 0.3:
+        # 0.3–1 MP → 35–70 score
+        score = 35 + ((megapixels - 0.3) / 0.7) * 35
+    else:
+        # Very low resolution
+        score = (megapixels / 0.3) * 35
 
-    min_px = 300
-    max_px = 2000
-
-    score = _clamp(
-        100.0 * (long_side - min_px) / (max_px - min_px)
-    )
+    score = float(np.clip(score, 0, 100))
 
     return {
         "factor_name": "resolution_score",
         "score": round(score, 1),
         "status": _classify(score),
         "description":
-            f"{w}×{h} px ({mp:.2f} MP). "
-            + (
-                "High resolution — text should be sharp."
+            f"Image size = {width} × {height} pixels "
+            f"({megapixels:.2f} MP). " +
+            (
+                "High resolution with sufficient text details."
                 if score >= 70 else
-                "Moderate resolution."
-                if score >= 45 else
-                "Low resolution — capture at higher DPI."
+                "Moderate resolution. OCR may have minor issues."
+                if score >= 35 else
+                "Low resolution. Capture a higher-quality image."
             ),
-        "raw_value": long_side,
-        "unit": "px (long side)",
+        "raw_value": round(megapixels, 2),
+        "unit": "Megapixels"
     }
-
-def _classify(score: float) -> str:
-    """
-    OCR quality classification
-    """
-    if score >= 70:
-        return "Good"
-    elif score >= 35:
-        return "Moderate"
-    else:
-        return "Poor"
 
 
 # ──────────────────────────────────────────────
-# Blur Score (OCR calibrated)
+# MANSI — Blur Score (OCR calibrated)
 # ──────────────────────────────────────────────
 def blur_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     """
@@ -167,7 +183,6 @@ def blur_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             "unit": "Laplacian variance"
         }
 
-    # Convert to grayscale
     if img_bgr.ndim == 3:
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     else:
@@ -176,7 +191,6 @@ def blur_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     # Slight denoising to avoid noise creating fake edges
     gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
-    # Calculate edge strength
     lap_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
 
     # Better scaling for documents
@@ -210,12 +224,13 @@ def blur_score(img_bgr: np.ndarray) -> Dict[str, Any]:
 
 
 # ──────────────────────────────────────────────
-# Contrast Score (OCR calibrated)
+# MANSI — Contrast Score (OCR calibrated)
 # ──────────────────────────────────────────────
 def contrast_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     """
-    Measure text and background separation.
-    Higher score = better contrast.
+    OCR-aware contrast score.
+    Measures text/background separation and adjusts for low resolution.
+    Higher score = better OCR readability.
     """
 
     if img_bgr is None or img_bgr.size == 0:
@@ -228,47 +243,59 @@ def contrast_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             "unit": "Intensity difference"
         }
 
-    # Convert to grayscale
     if img_bgr.ndim == 3:
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     else:
         gray = img_bgr.copy()
 
-    # Use robust intensity range
+    h, w = gray.shape
+    pixels = h * w
+
+    # Robust contrast using percentiles
     p5 = float(np.percentile(gray, 5))
     p95 = float(np.percentile(gray, 95))
-
     contrast = p95 - p5
 
-    # Wider contrast range for scanned documents
-    # < 40  : low contrast
-    # 40-120: moderate
-    # >120  : good
-    score = (
-        (contrast - 15) /
-        (220 - 15)
-    ) * 100
+    # Normalize contrast to 0-100
+    # 20 = very poor, 180 = excellent
+    base_score = ((contrast - 20) / (180 - 20)) * 100
+    base_score = float(np.clip(base_score, 0, 100))
 
-    score = float(np.clip(score, 0, 100))
+    # --------------------------------------------------
+    # Resolution penalty for OCR
+    # Small images lose character details
+    # --------------------------------------------------
+    if pixels >= 1_000_000:
+        res_factor = 1.0      # High resolution
+    elif pixels >= 500_000:
+        res_factor = 0.90
+    elif pixels >= 250_000:
+        res_factor = 0.80
+    else:
+        res_factor = 0.70     # Very small documents
+
+    # Keep some contrast credit even for low resolution
+    final_score = base_score * (0.5 + 0.5 * res_factor)
+    final_score = float(np.clip(final_score, 0, 100))
 
     return {
         "factor_name": "contrast_score",
-        "score": round(score, 1),
-        "status": _classify(score),
+        "score": round(final_score, 1),
+        "status": _classify(final_score),
         "description": (
             f"Contrast difference = {contrast:.1f}. "
             + (
-                "Text and background are clearly separated."
-                if score >= 75 else
-                "Moderate contrast."
-                if score >= 45 else
-                "Low contrast and OCR may fail."
+                "Excellent text/background separation."
+                if final_score >= 80 else
+                "Moderate contrast suitable for OCR."
+                if final_score >= 50 else
+                "Low contrast; OCR accuracy may decrease."
             )
         ),
         "raw_value": round(contrast, 2),
         "unit": "Intensity difference"
     }
-    
+
 
 # ──────────────────────────────────────────────
 # VIVEK — Stroke Width Score
@@ -339,14 +366,17 @@ def text_density_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         "status": _classify(score),
         "description": f"Text coverage = {density_pct:.1f}% of image. "
                        + ("text density too high" if score >= 70
-                          else "Text is sparse or very dense." 
+                          else "Text is sparse or very dense."
                           if score >= 45
                           else "Extremely sparse"),
         "raw_value": round(density_pct, 2),
         "unit": "% text pixel coverage",
     }
 
-#matra scoring
+
+# ──────────────────────────────────────────────
+# KRISH — Matra Continuity Score
+# ──────────────────────────────────────────────
 
 def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     """
@@ -408,7 +438,6 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         if shiro_zone.size > 0:
             col_ink = shiro_zone.sum(axis=0)
             zone_h  = shiro_zone.shape[0]
-            # FIX 1: relaxed threshold 0.30 → 0.15
             active  = col_ink >= max(1, int(zone_h * 0.15) * 255)
 
             max_gap = 0
@@ -419,12 +448,10 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
                     max_gap = max(max_gap, current_gap)
                 else:
                     current_gap = 0
-            # Dynamic gap threshold based on image width
             gap_threshold = max(20, int(w * 0.02))  # 2% of image width
             if max_gap <= gap_threshold:
                 scs = 100.0
             else:
-                # FIX 2: softer penalty 5.0 → 2.0
                 penalty = min(100.0, (max_gap - gap_threshold) * 2.0)
                 scs = max(0.0, 100.0 - penalty)
         else:
@@ -437,13 +464,13 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             n, _, stats, _ = cv2.connectedComponentsWithStats(
                 zone, connectivity=8)
             if n <= 1:
-                return 100.0  # FIX 3: clean zone not a failure
+                return 100.0
             min_area = 4
             valid = sum(1 for i in range(1, n)
                         if stats[i, cv2.CC_STAT_AREA] >= min_area)
             total = n - 1
             if total == 0:
-                return 100.0  # FIX 3: clean zone not a failure
+                return 100.0
             return float(np.clip((valid / total) * 100, 0, 100))
 
         mvs_upper = mvs(upper_zone)
@@ -470,8 +497,8 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             runs_arr = np.array(runs, dtype=np.float32)
             mean_r = runs_arr.mean()
             if mean_r > 0:
-                    cov = runs_arr.std() / mean_r
-                    rlr = float(np.clip(100.0 * np.exp(-cov * 0.5), 0, 100))
+                cov = runs_arr.std() / mean_r
+                rlr = float(np.clip(100.0 * np.exp(-cov * 0.5), 0, 100))
             else:
                 rlr = 0.0
         else:
@@ -484,7 +511,6 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             row_idx = np.arange(middle_zone.shape[0], dtype=np.float32)
             coms = (ink * row_idx[:, None]).sum(axis=0) / col_sum
             var = float(coms.var())
-            # FIX 4: relaxed variance max 5.0 → 30.0
             bs = float(np.clip(100.0 * np.exp(-var / 30.0), 0, 100))
         else:
             bs = 50.0
@@ -514,16 +540,15 @@ def matra_continuity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
                 angles.append(
                     math.degrees(math.atan2(y2 - y1, x2 - x1)))
             std = float(np.array(angles).std())
-            # FIX 5: relaxed angle std 5.0 → 10.0
             ss = float(np.clip(100.0 * np.exp(-std / 10.0), 0, 100))
         else:
             ss = 50.0
 
         # ── MCS formula — rebalanced weights ─────────────────────────
         line_mcs = (0.22 * scs +
-            0.28 * mvs_upper +  # ← increased
-            0.10 * rlr +        # ← reduced significantly
-            0.18 * mvs_lower +  # ← increased
+            0.28 * mvs_upper +
+            0.10 * rlr +
+            0.18 * mvs_lower +
             0.12 * bs +
             0.06 * ns +
             0.04 * ss)
@@ -612,10 +637,10 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             valid = [i for i in range(1, n)
                      if stats[i, cv2.CC_STAT_AREA] >= 3]
             if not valid:
-                return 50.0  # FIX: neutral not 0
+                return 50.0
             total_ink = sum(stats[i, cv2.CC_STAT_AREA] for i in valid)
             mean_cc = total_ink / max(1, len(valid))
-            rel = mean_cc / max(1, patch.size)  # FIX: avoid /0
+            rel = mean_cc / max(1, patch.size)
             result = float(np.clip(rel * 10000, 0, 100))
             return result if not np.isnan(result) else 50.0
         except Exception:
@@ -626,14 +651,14 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             return 50.0
         try:
             if patch.sum() == 0:
-                return 50.0  # FIX: no ink = neutral
+                return 50.0
             dist = cv2.distanceTransform(patch, cv2.DIST_L2, 5)
             vals = dist[dist > 0]
             if len(vals) < 5:
                 return 50.0
             mean_val = float(vals.mean())
             if mean_val == 0:
-                return 50.0  # FIX: avoid /0
+                return 50.0
             cov = float(vals.std() / mean_val)
             if cov <= 0.4:
                 return 100.0
@@ -647,7 +672,7 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         if patch is None or patch.size == 0:
             return 50.0
         try:
-            ratio = float(np.count_nonzero(patch)) / max(1, patch.size)  # FIX
+            ratio = float(np.count_nonzero(patch)) / max(1, patch.size)
             lo, hi = 0.05, 0.70
             if ratio < lo:
                 result = float(np.clip((ratio / lo) * 100, 0, 100))
@@ -667,7 +692,7 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             lap = cv2.Laplacian(patch.astype(np.float32), cv2.CV_32F)
             energy = float((lap ** 2).mean())
             if np.isnan(energy) or np.isinf(energy):
-                return 50.0  # FIX: guard nan/inf
+                return 50.0
             result = float(np.clip(
                 100.0 * (1.0 - np.exp(-energy / 50.0)), 0, 100))
             return result if not np.isnan(result) else 50.0
@@ -706,7 +731,6 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             zs_middle = zone_score(middle_patch)
             zs_lower  = zone_score(lower_patch)
 
-            # Final ZIS with Pal-Chaudhuri weights
             zis = (0.40 * zs_shiro +
                    0.30 * zs_middle +
                    0.20 * zs_upper +
@@ -714,7 +738,6 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
 
             zis = float(np.clip(zis, 0, 100))
 
-            # FIX: only append valid scores
             if not np.isnan(zis) and not np.isinf(zis):
                 line_scores.append(zis)
 
@@ -725,7 +748,6 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     if not line_scores:
         score = 50.0
     else:
-        # FIX: filter nan before averaging
         valid_scores = [s for s in line_scores
                         if not np.isnan(s) and not np.isinf(s)]
         if not valid_scores:
@@ -734,7 +756,6 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
             score = float(np.mean(valid_scores))
             score = float(np.clip(score, 0, 100))
 
-    # Final nan guard
     if np.isnan(score) or np.isinf(score):
         score = 50.0
 
@@ -752,6 +773,7 @@ def zone_integrity_score(img_bgr: np.ndarray) -> Dict[str, Any]:
         "raw_value": round(score, 2),
         "unit": "ZIS (0-100)",
     }
+
 
 # ──────────────────────────────────────────────
 # TANUSHA — Connected Component Stability Score
@@ -777,7 +799,6 @@ def connected_component_stability_score(img_bgr: np.ndarray) -> Dict[str, Any]:
     _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=8)
-    # stats[:,4] = area; label 0 is background
     areas = stats[1:, cv2.CC_STAT_AREA]
     areas = areas[areas >= 4]  # drop tiny specks
 
