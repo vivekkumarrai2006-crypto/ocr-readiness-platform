@@ -61,28 +61,29 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
 .top-banner h1{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;margin:0;color:white !important;}
 .top-banner p{font-size:13px;color:rgba(255,255,255,0.7);margin:4px 0 0 0;}
 
-.metric-card{background:white;border-radius:12px;padding:16px;
-    box-shadow:0 2px 8px rgba(0,0,0,0.07);border-top:3px solid #00C4B4;
-    text-align:center;margin-bottom:8px;position:relative;
+.metric-card{background:white;border-radius:12px 12px 0 0;padding:20px;
+    border-top:3px solid #00C4B4;
+    text-align:center;margin-bottom:0;position:relative;
     display:flex;flex-direction:column;justify-content:flex-start;
-    height:220px;overflow:hidden;}
-.metric-card .label{font-size:13px;font-weight:700;color:#374151;
-    text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.metric-card .value{font-size:28px;font-weight:700;
+    height:240px;overflow:hidden;}
+.metric-card .label{font-size:17px;font-weight:800;color:#0F1E36;
+    text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    display:block;}
+.metric-card .value{font-size:34px;font-weight:700;line-height:1.1;
     font-family:'Space Grotesk',sans-serif;}
-.metric-card .badge{display:inline-block;padding:3px 12px;border-radius:20px;
-    font-size:13px;font-weight:600;margin-top:4px;align-self:center;}
+.metric-card .badge{display:inline-block;padding:4px 14px;border-radius:20px;
+    font-size:14px;font-weight:700;margin-top:6px;align-self:center;}
 .badge-excellent{background:#D1FAE5;color:#065F46;}
 .badge-good{background:#DBEAFE;color:#1E40AF;}
 .badge-average{background:#FEF3C7;color:#92400E;}
 .badge-poor{background:#FEE2E2;color:#991B1B;}
 .badge-error{background:#F3F4F6;color:#6B7280;}
-.metric-card .short-desc{font-size:13px;color:#4B5563;margin-top:7px;
-    font-style:italic;font-weight:500;line-height:1.4;
+.metric-card .short-desc{font-size:14px;color:#374151;margin-top:8px;
+    font-style:italic;font-weight:600;line-height:1.5;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;flex-grow:1;}
-.metric-card .weight-src{font-size:11px;color:#9CA3AF;margin-top:5px;}
+.metric-card .weight-src{font-size:12px;color:#6B7280;font-weight:600;margin-top:6px;}
 
 .score-ring-wrap{display:flex;flex-direction:column;align-items:center;
     justify-content:center;padding:20px;
@@ -117,8 +118,9 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
 .api-local{background:#F3F4F6;color:#374151;}
 
 .desc-box{background:#F8FAFC;border-left:3px solid #00C4B4;
-    padding:12px 16px;border-radius:0 8px 8px 0;
-    font-size:13px;color:#374151;line-height:1.6;margin-top:8px;}
+    padding:14px 18px;border-radius:0 8px 8px 0;
+    font-size:15px;color:#1F2937;line-height:1.7;margin-top:8px;margin-bottom:14px;
+    font-weight:500;}
 
 .clear-btn{text-align:right;margin-bottom:8px;}
 </style>
@@ -448,28 +450,38 @@ if "🏠 Analyse Image" in nav:
             short_desc = get_short_description(key, float(sc))
 
             with cols[i % 4]:
-                st.markdown(f"""
-                <div class="metric-card">
-                  <div class="label">{display}</div>
-                  <div class="value" style="color:{col};">{sc}</div>
-                  <span class="badge {bcls}">{s}</span>
-                  <div class="short-desc">{short_desc}</div>
-                  <div class="weight-src">Weight: {int(WEIGHTS[key]*100)}% &nbsp;{src_tag}</div>
-                </div>""", unsafe_allow_html=True)
+                with st.container(border=True):
+                    st.markdown(f"""
+                    <div class="metric-card">
+                      <div class="label">{display}</div>
+                      <div class="value" style="color:{col};">{sc}</div>
+                      <span class="badge {bcls}">{s}</span>
+                      <div class="short-desc">{short_desc}</div>
+                      <div class="weight-src">Weight: {int(WEIGHTS[key]*100)}% &nbsp;{src_tag}</div>
+                    </div>""", unsafe_allow_html=True)
 
-                # ── Expandable description + formula below the card ──
-                # (fixed-height inner container keeps every opened panel the same size)
-                with st.expander("📄 More about this factor"):
-                    with st.container(height=220, border=False):
-                        rich_desc = get_factor_description(key, float(sc))
-                        st.markdown(
-                            f'<div class="desc-box">{rich_desc}</div>',
-                            unsafe_allow_html=True,
-                        )
-                        if key in FACTOR_INFO:
-                            st.markdown("**🧮 How it's calculated:**")
-                            st.code(FACTOR_INFO[key]["formula"], language=None)
-                # ──────────────────────────────────────────────────────
+                    # ── Definition + description + formula, INSIDE the same card ──
+                    # (fixed-height inner container keeps every opened panel the same size)
+                    with st.expander("📄 More about this factor"):
+                        with st.container(height=320, border=False):
+                            if key in FACTOR_INFO:
+                                st.markdown("**📖 What is this factor?**")
+                                st.markdown(
+                                    f'<div class="desc-box">{FACTOR_INFO[key]["definition"]}</div>',
+                                    unsafe_allow_html=True,
+                                )
+
+                            st.markdown(f"**💬 Why is your score {s}?**")
+                            rich_desc = get_factor_description(key, float(sc))
+                            st.markdown(
+                                f'<div class="desc-box">{rich_desc}</div>',
+                                unsafe_allow_html=True,
+                            )
+
+                            if key in FACTOR_INFO:
+                                st.markdown("**🧮 How it's calculated:**")
+                                st.code(FACTOR_INFO[key]["formula"], language=None)
+                    # ────────────────────────────────────────────────────────────────
 
         st.markdown("<br>", unsafe_allow_html=True)
 
