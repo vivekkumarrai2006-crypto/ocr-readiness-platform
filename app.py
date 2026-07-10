@@ -473,16 +473,24 @@ if "🏠 Analyse Image" in nav:
             if key in FACTOR_INFO:
                 fi    = FACTOR_INFO[key]
                 ideal = fi["ideal_range"].split(".")[0]
-                defn  = fi["definition"][:150] + "…" if len(fi["definition"]) > 150 else fi["definition"]
-                imp   = fi["ocr_impact"][:150] + "…" if len(fi["ocr_impact"]) > 150 else fi["ocr_impact"]
-                # Clean any special characters that could break HTML
-                defn  = defn.replace("<","&lt;").replace(">","&gt;")
-                imp   = imp.replace("<","&lt;").replace(">","&gt;")
+
+                # Clean text — remove newlines, bullets, special chars that break HTML
+                def clean_text(text, limit=150):
+                    import html
+                    t = text.replace("\n", " ").replace("•", "-").replace("·", "-")
+                    t = html.escape(t)   # escapes <, >, &, ", '
+                    t = t[:limit] + "…" if len(t) > limit else t
+                    return t
+
+                defn  = clean_text(fi["definition"], 150)
+                imp   = clean_text(fi["ocr_impact"], 150)
+                ideal_clean = clean_text(ideal, 100)
+
                 info_html = f"""
-                <div class="info-row"><span class="info-label">👤 Owner:</span> {fi['owner']}</div>
-                <div class="info-row"><span class="info-label">📖 What it is:</span> {defn}</div>
-                <div class="info-row"><span class="info-label">🎯 OCR Impact:</span> {imp}</div>
-                <div class="info-row"><span class="info-label">✅ Ideal Range:</span> {ideal}</div>"""
+                <div class="info-row"><span class="info-label">&#128100; Owner:</span> {fi['owner']}</div>
+                <div class="info-row"><span class="info-label">&#128214; What it is:</span> {defn}</div>
+                <div class="info-row"><span class="info-label">&#127919; OCR Impact:</span> {imp}</div>
+                <div class="info-row"><span class="info-label">&#9989; Ideal Range:</span> {ideal_clean}</div>"""
 
             # Unique checkbox ID for each card (pure CSS toggle)
             chk_id = f"chk_{key}"
