@@ -73,29 +73,49 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
 .top-banner h1{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;margin:0;color:white !important;}
 .top-banner p{font-size:13px;color:rgba(255,255,255,0.7);margin:4px 0 0 0;}
 
-.metric-card{background:white;border-radius:12px 12px 0 0;padding:20px;
-    border-top:3px solid #00C4B4;
-    text-align:center;margin-bottom:0;position:relative;
-    display:flex;flex-direction:column;justify-content:flex-start;
-    height:240px;overflow:hidden;}
-.metric-card .label{font-size:17px;font-weight:800;color:#0F1E36;
-    text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    display:block;}
-.metric-card .value{font-size:34px;font-weight:700;line-height:1.1;
+.metric-card{background:white;border-radius:12px;padding:16px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.07);border-top:3px solid #00C4B4;
+    text-align:center;margin-bottom:8px;position:relative;}
+.metric-card .label{font-size:13px;font-weight:700;color:#374151;
+    text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;}
+.metric-card .value{font-size:28px;font-weight:700;
     font-family:'Space Grotesk',sans-serif;}
-.metric-card .badge{display:inline-block;padding:4px 14px;border-radius:20px;
-    font-size:14px;font-weight:700;margin-top:6px;align-self:center;}
+.metric-card .badge{display:inline-block;padding:3px 12px;border-radius:20px;
+    font-size:13px;font-weight:600;margin-top:4px;}
 .badge-excellent{background:#D1FAE5;color:#065F46;}
 .badge-good{background:#DBEAFE;color:#1E40AF;}
 .badge-average{background:#FEF3C7;color:#92400E;}
 .badge-poor{background:#FEE2E2;color:#991B1B;}
 .badge-error{background:#F3F4F6;color:#6B7280;}
-.metric-card .short-desc{font-size:14px;color:#374151;margin-top:8px;
-    font-style:italic;font-weight:600;line-height:1.5;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-    overflow:hidden;flex-grow:1;}
-.metric-card .weight-src{font-size:12px;color:#6B7280;font-weight:600;margin-top:6px;}
+.metric-card .short-desc{font-size:13px;color:#4B5563;margin-top:7px;
+    font-style:italic;font-weight:500;line-height:1.4;}
+.metric-card .weight-src{font-size:11px;color:#9CA3AF;margin-top:5px;}
+
+/* ── Pure CSS toggle — no JS/rerun needed ── */
+.toggle-check{display:none;}
+.toggle-arrow{
+    display:block;margin:10px auto 0 auto;
+    width:28px;height:28px;line-height:28px;text-align:center;
+    background:#F3F4F6;border-radius:50%;cursor:pointer;
+    font-size:14px;color:#6B7280;user-select:none;
+    transition:background 0.2s,transform 0.2s;}
+.toggle-arrow:hover{background:#E5E7EB;color:#374151;}
+.card-info-panel{
+    display:none;
+    background:#EFF6FF;border-left:3px solid #3B82F6;
+    border-radius:8px;padding:10px 12px;margin-top:10px;
+    text-align:left;font-size:11px;color:#1E3A5F;line-height:1.7;
+    overflow:hidden;word-wrap:break-word;word-break:break-word;
+    white-space:normal;max-width:100%;box-sizing:border-box;}
+.card-info-panel .info-title{font-weight:700;font-size:12px;
+    color:#1A2B4A;margin-bottom:6px;}
+.card-info-panel .info-row{margin-bottom:5px;word-wrap:break-word;
+    overflow-wrap:break-word;white-space:normal;}
+.card-info-panel .info-label{font-weight:600;color:#3B82F6;}
+/* When checkbox is checked: show panel and rotate arrow */
+.toggle-check:checked ~ .card-info-panel{display:block;}
+.toggle-check:checked ~ .toggle-arrow{
+    background:#DBEAFE;color:#1D4ED8;transform:rotate(180deg);}
 
 .score-ring-wrap{display:flex;flex-direction:column;align-items:center;
     justify-content:center;padding:20px;
@@ -113,8 +133,7 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
 .rec-box.warn{background:#FFFBEB;border-left-color:#F59E0B;}
 
 .info-card{background:#F9FAFB;border:1px solid #E5E7EB;
-    border-radius:10px;padding:16px;margin-bottom:12px;
-    min-height:150px;display:flex;flex-direction:column;justify-content:center;}
+    border-radius:10px;padding:16px;margin-bottom:12px;}
 .info-card h4{color:#1A2B4A;margin:0 0 8px 0;
     font-family:'Space Grotesk',sans-serif;}
 .owner-tag{display:inline-block;background:#EFF6FF;color:#1D4ED8;
@@ -130,9 +149,8 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
 .api-local{background:#F3F4F6;color:#374151;}
 
 .desc-box{background:#F8FAFC;border-left:3px solid #00C4B4;
-    padding:14px 18px;border-radius:0 8px 8px 0;
-    font-size:15px;color:#1F2937;line-height:1.7;margin-top:8px;margin-bottom:14px;
-    font-weight:500;}
+    padding:12px 16px;border-radius:0 8px 8px 0;
+    font-size:13px;color:#374151;line-height:1.6;margin-top:8px;}
 
 .clear-btn{text-align:right;margin-bottom:8px;}
 </style>
@@ -220,6 +238,7 @@ if "image_name"       not in st.session_state: st.session_state.image_name      
 if "raw_pil"          not in st.session_state: st.session_state.raw_pil          = None
 if "analysis_img"     not in st.session_state: st.session_state.analysis_img     = None
 if "recs"             not in st.session_state: st.session_state.recs             = []
+if "card_info_open"   not in st.session_state: st.session_state.card_info_open   = {}
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -478,39 +497,49 @@ if "🏠 Analyse Image" in nav:
 
             short_desc = get_short_description(key, float(sc))
 
+            # Build info panel content
+            info_html = ""
+            if key in FACTOR_INFO:
+                fi    = FACTOR_INFO[key]
+                ideal = fi["ideal_range"].split(".")[0]
+
+                # Clean text — remove newlines, bullets, special chars that break HTML
+                def clean_text(text, limit=150):
+                    import html
+                    t = text.replace("\n", " ").replace("•", "-").replace("·", "-")
+                    t = html.escape(t)   # escapes <, >, &, ", '
+                    t = t[:limit] + "…" if len(t) > limit else t
+                    return t
+
+                defn  = clean_text(fi["definition"], 150)
+                imp   = clean_text(fi["ocr_impact"], 150)
+                ideal_clean = clean_text(ideal, 100)
+
+                info_html = f"""
+                <div class="info-row"><span class="info-label">&#128100; Owner:</span> {fi['owner']}</div>
+                <div class="info-row"><span class="info-label">&#128214; What it is:</span> {defn}</div>
+                <div class="info-row"><span class="info-label">&#127919; OCR Impact:</span> {imp}</div>
+                <div class="info-row"><span class="info-label">&#9989; Ideal Range:</span> {ideal_clean}</div>"""
+
+            # Unique checkbox ID for each card (pure CSS toggle)
+            chk_id = f"chk_{key}"
+
             with cols[i % 4]:
-                with st.container(border=True):
-                    st.markdown(f"""
-                    <div class="metric-card">
-                      <div class="label">{display}</div>
-                      <div class="value" style="color:{col};">{sc}</div>
-                      <span class="badge {bcls}">{s}</span>
-                      <div class="short-desc">{short_desc}</div>
-                      <div class="weight-src">Weight: {int(WEIGHTS[key]*100)}% &nbsp;{src_tag}</div>
-                    </div>""", unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="metric-card">
+                  <div class="label">{display}</div>
+                  <div class="value" style="color:{col};">{sc}</div>
+                  <span class="badge {bcls}">{s}</span>
+                  <div class="short-desc">{short_desc}</div>
+                  <div class="weight-src">Weight: {int(WEIGHTS[key]*100)}% &nbsp;{src_tag}</div>
 
-                    # ── Definition + description + formula, INSIDE the same card ──
-                    # (fixed-height inner container keeps every opened panel the same size)
-                    with st.expander("📄 More about this factor"):
-                        with st.container(height=320, border=False):
-                            if key in FACTOR_INFO:
-                                st.markdown("**📖 What is this factor?**")
-                                st.markdown(
-                                    f'<div class="desc-box">{FACTOR_INFO[key]["definition"]}</div>',
-                                    unsafe_allow_html=True,
-                                )
-
-                            st.markdown(f"**💬 Why is your score {s}?**")
-                            rich_desc = get_factor_description(key, float(sc))
-                            st.markdown(
-                                f'<div class="desc-box">{rich_desc}</div>',
-                                unsafe_allow_html=True,
-                            )
-
-                            if key in FACTOR_INFO:
-                                st.markdown("**🧮 How it's calculated:**")
-                                st.code(FACTOR_INFO[key]["formula"], language=None)
-                    # ────────────────────────────────────────────────────────────────
+                  <input type="checkbox" class="toggle-check" id="{chk_id}">
+                  <div class="card-info-panel">
+                    <div class="info-title">📐 {FACTOR_INFO[key]['display_name'] if key in FACTOR_INFO else display}</div>
+                    {info_html}
+                  </div>
+                  <label class="toggle-arrow" for="{chk_id}">∨</label>
+                </div>""", unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -658,74 +687,64 @@ elif "📊 History" in nav:
 # ════════════════════════════════════════════════
 # PAGE 3 — About Factors
 # ════════════════════════════════════════════════
-elif "📖 About Factors" in nav:
+elif "📖 About" in nav:
 
     st.markdown("""
     <div class="top-banner">
-        <h1>📖 About the OCR Quality Factors</h1>
-        <p>
-            Learn how each quality factor influences OCR performance,
-            how it is calculated, and the recommended score for achieving
-            high OCR accuracy.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+      <h1>📖 About the 10 Quality Factors</h1>
+      <p>Definition · Importance · Formula · OCR Impact · Ideal Range</p>
+    </div>""", unsafe_allow_html=True)
 
     selected = st.selectbox(
         "Select a Quality Factor",
         options=list(FACTOR_INFO.keys()),
-        format_func=lambda x: FACTOR_INFO[x]["display_name"]
+        format_func=lambda k: FACTOR_INFO[k]["display_name"],
     )
-
     info = FACTOR_INFO[selected]
 
-    st.markdown(f"""
-    <div class="info-card">
-        <h3>{info['display_name']}</h3>
-        <span class="owner-tag">👤 Owner: {info['owner']}</span>
-        <p style="margin-top:10px;">
-            {info['definition']}
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # ── Main info card using native Streamlit ──
+    with st.container(border=True):
+        st.markdown(f"## 📐 {info['display_name']}")
+        st.markdown(
+            f'<span style="display:inline-block;background:#EFF6FF;color:#1D4ED8;'
+            f'font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;'
+            f'margin-bottom:12px;">👤 Assigned to: {info["owner"]}</span>',
+            unsafe_allow_html=True)
+        st.markdown(f"**{info['definition']}**")
 
-    col1, col2 = st.columns(2)
+    st.markdown("")
 
-    with col1:
-        with st.container(height=300, border=True):
-            st.subheader("📌 Why This Factor Matters")
-            st.write(info["importance"])
+    # ── 2-column detail section ──
+    c1, c2 = st.columns(2)
 
-            st.subheader("🎯 Impact on OCR")
-            st.write(info["ocr_impact"])
+    with c1:
+        with st.container(border=True):
+            st.markdown("### 📌 Why This Factor Matters")
+            st.markdown(info["importance"])
 
-    with col2:
-        with st.container(height=300, border=True):
-            st.subheader("🧮 Calculation Method")
+        with st.container(border=True):
+            st.markdown("### 🎯 Effect on OCR")
+            st.markdown(info["ocr_impact"])
+
+    with c2:
+        with st.container(border=True):
+            st.markdown("### 🧮 Calculation Method")
             st.code(info["formula"], language=None)
 
-            st.subheader("✅ Recommended Range")
+        with st.container(border=True):
+            st.markdown("### ✅ Ideal Score Range")
             st.success(info["ideal_range"])
 
     st.markdown("---")
+    st.markdown("#### All 10 Factors at a Glance")
+    rows = [{
+        "Factor":      v["display_name"],
+        "Owner":       v["owner"],
+        "Weight":      f"{int(WEIGHTS[k]*100)}%",
+        "Ideal Range": v["ideal_range"].split(".")[0],
+    } for k,v in FACTOR_INFO.items()]
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
-    st.subheader("📊 Summary of All OCR Factors")
-
-    summary = []
-
-    for key, value in FACTOR_INFO.items():
-        summary.append({
-            "Factor": value["display_name"],
-            "Owner": value["owner"],
-            "Weight": f"{int(WEIGHTS[key] * 100)}%",
-            "Ideal Score": value["ideal_range"].split(".")[0]
-        })
-
-    st.dataframe(
-        pd.DataFrame(summary),
-        use_container_width=True,
-        hide_index=True
-    )
 
 # ════════════════════════════════════════════════
 # PAGE 4 — API Status
