@@ -22,12 +22,11 @@ from descriptions import get_factor_description
 from short_descriptions import get_short_description
 from api_integration import call_all_team_apis, KNOWN_ISSUES, get_current_urls
 from config_manager import load_config, save_config, build_urls, PORTS, ENDPOINTS
-
 try:
     import pytesseract
-    # ── SET YOUR TESSERACT PATH HERE ──────────────────────────────────────
+    # Only needed on Windows if tesseract isn't on PATH.
+    # On Streamlit Cloud (Linux), apt-installed tesseract is already on PATH — leave this commented.
     # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-    # ─────────────────────────────────────────────────────────────────────
     try:
         pytesseract.get_tesseract_version()
         TESSERACT_OK = True
@@ -45,7 +44,6 @@ except ImportError:
     pytesseract = None
     TESSERACT_OK = False
     TESSERACT_ERROR = "pytesseract is not installed. Install it in your Python environment."
-
 try:
     from streamlit_cropper import st_cropper
     CROPPER_OK = True
