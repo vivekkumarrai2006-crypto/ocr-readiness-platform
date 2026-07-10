@@ -92,10 +92,13 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
     display:none;
     background:#EFF6FF;border-left:3px solid #3B82F6;
     border-radius:8px;padding:10px 12px;margin-top:10px;
-    text-align:left;font-size:12px;color:#1E3A5F;line-height:1.7;}
-.card-info-panel .info-title{font-weight:700;font-size:13px;
+    text-align:left;font-size:11px;color:#1E3A5F;line-height:1.7;
+    overflow:hidden;word-wrap:break-word;word-break:break-word;
+    white-space:normal;max-width:100%;box-sizing:border-box;}
+.card-info-panel .info-title{font-weight:700;font-size:12px;
     color:#1A2B4A;margin-bottom:6px;}
-.card-info-panel .info-row{margin-bottom:5px;}
+.card-info-panel .info-row{margin-bottom:5px;word-wrap:break-word;
+    overflow-wrap:break-word;white-space:normal;}
 .card-info-panel .info-label{font-weight:600;color:#3B82F6;}
 /* When checkbox is checked: show panel and rotate arrow */
 .toggle-check:checked ~ .card-info-panel{display:block;}
@@ -470,11 +473,14 @@ if "🏠 Analyse Image" in nav:
             if key in FACTOR_INFO:
                 fi    = FACTOR_INFO[key]
                 ideal = fi["ideal_range"].split(".")[0]
-                defn  = fi["definition"][:130] + "…" if len(fi["definition"]) > 130 else fi["definition"]
-                imp   = fi["ocr_impact"][:130] + "…" if len(fi["ocr_impact"]) > 130 else fi["ocr_impact"]
+                defn  = fi["definition"][:150] + "…" if len(fi["definition"]) > 150 else fi["definition"]
+                imp   = fi["ocr_impact"][:150] + "…" if len(fi["ocr_impact"]) > 150 else fi["ocr_impact"]
+                # Clean any special characters that could break HTML
+                defn  = defn.replace("<","&lt;").replace(">","&gt;")
+                imp   = imp.replace("<","&lt;").replace(">","&gt;")
                 info_html = f"""
                 <div class="info-row"><span class="info-label">👤 Owner:</span> {fi['owner']}</div>
-                <div class="info-row"><span class="info-label">📖 Definition:</span> {defn}</div>
+                <div class="info-row"><span class="info-label">📖 What it is:</span> {defn}</div>
                 <div class="info-row"><span class="info-label">🎯 OCR Impact:</span> {imp}</div>
                 <div class="info-row"><span class="info-label">✅ Ideal Range:</span> {ideal}</div>"""
 
