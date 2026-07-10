@@ -28,9 +28,23 @@ try:
     # ── SET YOUR TESSERACT PATH HERE ──────────────────────────────────────
     # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
     # ─────────────────────────────────────────────────────────────────────
-    TESSERACT_OK = True
+    try:
+        pytesseract.get_tesseract_version()
+        TESSERACT_OK = True
+        TESSERACT_ERROR = None
+    except pytesseract.pytesseract.TesseractNotFoundError:
+        TESSERACT_OK = False
+        TESSERACT_ERROR = (
+            "Tesseract executable not found. "
+            "Install Tesseract OCR or set pytesseract.pytesseract.tesseract_cmd in app.py."
+        )
+    except Exception as e:
+        TESSERACT_OK = False
+        TESSERACT_ERROR = f"Tesseract initialization failed: {e}"
 except ImportError:
+    pytesseract = None
     TESSERACT_OK = False
+    TESSERACT_ERROR = "pytesseract is not installed. Install it in your Python environment."
 
 try:
     from streamlit_cropper import st_cropper
@@ -137,15 +151,29 @@ def score_color(s):
 
 def run_tesseract(img):
     if not TESSERACT_OK:
-        return None, None
+        return None, None, None
     try:
-        data  = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-        confs = [c for c in data["conf"] if isinstance(c,(int,float)) and c >= 0]
-        if confs:
-            return round(float(np.mean(confs)),1), pytesseract.image_to_string(img)
-        return None, None
+        data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+        raw_conf = data.get("conf", [])
+        parsed_conf = []
+        for c in raw_conf:
+            try:
+                cval = float(c)
+            except (TypeError, ValueError):
+                continue
+            if cval >= 0:
+                parsed_conf.append(cval)
+        if parsed_conf:
+            return round(float(np.mean(parsed_conf)), 1), pytesseract.image_to_string(img), {
+                "raw": raw_conf,
+                "parsed": parsed_conf,
+            }
+        return None, pytesseract.image_to_string(img), {
+            "raw": raw_conf,
+            "parsed": parsed_conf,
+        }
     except Exception:
-        return None, None
+        return None, None, None
 
 def make_radar(factor_results):
     keys   = list(DISPLAY_NAMES.keys())
@@ -187,6 +215,7 @@ if "final_results"    not in st.session_state: st.session_state.final_results   
 if "api_status"       not in st.session_state: st.session_state.api_status       = {}
 if "ocr_conf"         not in st.session_state: st.session_state.ocr_conf         = None
 if "ocr_text"         not in st.session_state: st.session_state.ocr_text         = ""
+if "ocr_debug"        not in st.session_state: st.session_state.ocr_debug        = None
 if "image_name"       not in st.session_state: st.session_state.image_name       = ""
 if "raw_pil"          not in st.session_state: st.session_state.raw_pil          = None
 if "analysis_img"     not in st.session_state: st.session_state.analysis_img     = None
@@ -335,7 +364,7 @@ if "🏠 Analyse Image" in nav:
         recs = generate_recommendations(final_results)
 
         with st.spinner("📝 Running Tesseract OCR…"):
-            ocr_conf, ocr_text = run_tesseract(analysis_img)
+            ocr_conf, ocr_text, ocr_debug = run_tesseract(analysis_img)
 
         ocr_readiness = final_results["ocr_readiness_score"]
 
@@ -347,6 +376,7 @@ if "🏠 Analyse Image" in nav:
         st.session_state.api_status    = api_status
         st.session_state.ocr_conf      = ocr_conf
         st.session_state.ocr_text      = ocr_text or ""
+        st.session_state.ocr_debug     = ocr_debug
         st.session_state.recs          = recs
 
     # ── Show results if analysis has been done ────
@@ -356,6 +386,7 @@ if "🏠 Analyse Image" in nav:
         api_status    = st.session_state.api_status
         ocr_conf      = st.session_state.ocr_conf
         ocr_text      = st.session_state.ocr_text
+        ocr_debug     = st.session_state.ocr_debug
         recs          = st.session_state.recs
         ocr_readiness = final_results["ocr_readiness_score"]
         ocr_stat      = final_results["ocr_readiness_status"]
@@ -506,9 +537,31 @@ if "🏠 Analyse Image" in nav:
                         st.markdown(f"<div style='text-align:center;font-size:12px;color:#6B7280;'>out of 100</div>", unsafe_allow_html=True)
 
         with tab2:
-            if ocr_conf is not None and ocr_text:
-                st.markdown(f"**Tesseract Confidence: {ocr_conf}%**")
+            if ocr_text:
+                if ocr_conf is not None:
+                    st.markdown(f"**Tesseract Confidence: {ocr_conf}%**")
+                else:
+                    st.warning(
+                        "Tesseract extracted text, but no valid confidence values were returned."
+                    )
                 st.text_area("Extracted Text", ocr_text, height=220)
+                if isinstance(ocr_debug, dict):
+                    raw_conf = ocr_debug.get("raw", [])
+                    parsed_conf = ocr_debug.get("parsed", [])
+                    with st.expander("Show OCR confidence debug data"):
+                        st.markdown("**Raw `conf` values from Tesseract:**")
+                        st.write(raw_conf)
+                        st.markdown("**Parsed numeric confidence values:**")
+                        st.write(parsed_conf)
+                        if parsed_conf:
+                            st.markdown(f"**Mean confidence:** {round(float(np.mean(parsed_conf)), 1)}%")
+                        else:
+                            st.markdown(
+                                "**No positive confidence scores were parsed.** "
+                                "This usually means Tesseract returned only `-1` or invalid `conf` values."
+                            )
+                else:
+                    st.info("No OCR debug data available.")
             else:
                 st.info(
                     "Tesseract OCR is not available or could not extract text.\n\n"
