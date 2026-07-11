@@ -16,7 +16,7 @@ import cv2
 
 from factors import run_all_factors, generate_recommendations, DISPLAY_NAMES, WEIGHTS
 from factor_info import FACTOR_INFO
-from storage import save_result, load_results, compute_correlations
+from storage import (save_result,load_results,compute_correlations,save_uploaded_image)
 from report import generate_pdf_report
 from descriptions import get_factor_description
 from short_descriptions import get_short_description
@@ -357,8 +357,9 @@ if "🏠 Analyse Image" in nav:
 
         ocr_readiness = final_results["ocr_readiness_score"]
 
-        save_result(image_name, final_results, ocr_readiness, ocr_conf)
-
+        save_uploaded_image(analysis_img,image_name)
+        save_result(image_name,final_results,ocr_readiness,ocr_conf)
+        
         # Store everything in session state
         st.session_state.analysis_done = True
         st.session_state.final_results = final_results
@@ -585,172 +586,279 @@ elif "📊 History" in nav:
     st.markdown("""
     <div class="top-banner">
       <h1>📊 Analysis History</h1>
-      <p>All past analyses · Sort · Filter · Click image name to preview</p>
-    </div>""", unsafe_allow_html=True)
+      <p>View all previous OCR analyses</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     df = load_results()
-    if df is None:
-        st.info("No results yet. Analyse some images first!")
+
+    if df is None or df.empty:
+        st.info("No analysis history available.")
         st.stop()
 
-    # ── Summary stats ─────────────────────────────
-    total = len(df)
-    avg_score = round(df["ocr_readiness_score"].mean(), 1) if "ocr_readiness_score" in df.columns else "—"
-    best_score = round(df["ocr_readiness_score"].max(), 1) if "ocr_readiness_score" in df.columns else "—"
+    # -----------------------------------------
+    # Keep only images that actually exist
+    # -----------------------------------------
 
-    m1, m2, m3 = st.columns(3)
-    with m1:
-        st.metric("Total Analyses", total)
-    with m2:
-        st.metric("Average OCR Readiness", f"{avg_score}/100")
-    with m3:
-        st.metric("Best Score", f"{best_score}/100")
+    uploads_folder = os.path.join(
+        os.path.dirname(__file__),
+        "uploads"
+    )
 
-    st.markdown("---")
+    df = df[
+        df["image_name"].apply(
+            lambda x: os.path.exists(
+                os.path.join(uploads_folder, str(x))
+            )
+        )
+    ]
 
-    # ── Sort controls ─────────────────────────────
-    st.markdown("#### 🔃 Sort & Filter")
-    col_sort, col_order, col_filter = st.columns([2, 1, 2])
+    if df.empty:
+        st.warning("No valid images found in uploads folder.")
+        st.stop()
 
-    sort_options = {
-        "Date (Timestamp)":        "timestamp",
-        "Image Name (A-Z)":        "image_name",
-        "OCR Readiness Score":     "ocr_readiness_score",
-        "Noise Score":             "noise_score",
-        "Blur Score":              "blur_score",
-        "Resolution Score":        "resolution_score",
-        "Contrast Score":          "contrast_score",
-    }
+    # -----------------------------------------
+    # Summary
+    # -----------------------------------------
 
-    with col_sort:
-        sort_by_label = st.selectbox("Sort by", list(sort_options.keys()))
-        sort_col = sort_options[sort_by_label]
+    c1, c2, c3 = st.columns(3)
 
-    with col_order:
-        sort_order = st.radio("Order", ["↓ Desc", "↑ Asc"], index=0)
-        ascending = sort_order == "↑ Asc"
+    with c1:
+        st.metric(
+            "Total Analyses",
+            len(df)
+        )
 
-    with col_filter:
-        search_term = st.text_input("🔍 Filter by image name", placeholder="Type to search…")
+    with c2:
+        st.metric(
+            "Average OCR Score",
+            round(df["ocr_readiness_score"].mean(), 1)
+        )
 
-    # Apply filter
-    filtered_df = df.copy()
-    if search_term:
-        filtered_df = filtered_df[
-            filtered_df["image_name"].str.contains(search_term, case=False, na=False)
+    with c3:
+        st.metric(
+            "Best OCR Score",
+            round(df["ocr_readiness_score"].max(), 1)
+        )
+
+    st.divider()
+
+    # -----------------------------------------
+    # Time Sorting
+    # -----------------------------------------
+
+    left, right = st.columns([3,2])
+
+    with left:
+
+        search = st.text_input(
+            "🔍 Search Image",
+            placeholder="Enter image name..."
+        )
+
+    with right:
+
+        order = st.radio(
+            "Time",
+            [
+                "Descending",
+                "Ascending"
+            ],
+            horizontal=True
+        )
+
+    ascending = order == "Ascending"
+
+    if search.strip():
+
+        df = df[
+            df["image_name"]
+            .str.contains(
+                search,
+                case=False,
+                na=False
+            )
         ]
 
-    # Apply sort
-    if sort_col in filtered_df.columns:
-        filtered_df = filtered_df.sort_values(sort_col, ascending=ascending)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    filtered_df = filtered_df.reset_index(drop=True)
+    df = df.sort_values(
+        "timestamp",
+        ascending=ascending
+    ).reset_index(drop=True)
+    st.caption(f"Showing {len(df)} analyses")
 
-    st.markdown(f"**Showing {len(filtered_df)} of {total} analyses**")
-    st.markdown("---")
+    st.divider()
 
-    # ── Rename columns to CAPS for display ────────
-    display_df = filtered_df.copy()
-    display_df.columns = [c.upper().replace("_", " ") for c in display_df.columns]
+    # ==========================================
+    # Display Table
+    # ==========================================
 
-    # ── Color-code OCR Readiness Score column ─────
-    def color_score(val):
+    display_df = df.copy()
+
+    display_df.columns = [
+        c.upper().replace("_", " ")
+        for c in display_df.columns
+    ]
+
+    def color_score(value):
+
         try:
-            v = float(val)
-            if v >= 81:   return "background-color:#D1FAE5;color:#065F46;font-weight:700"
-            elif v >= 61: return "background-color:#DBEAFE;color:#1E40AF;font-weight:700"
-            elif v >= 41: return "background-color:#FEF3C7;color:#92400E;font-weight:700"
-            else:         return "background-color:#FEE2E2;color:#991B1B;font-weight:700"
+
+            value = float(value)
+
+            if value >= 81:
+                return "background-color:#D1FAE5;color:#065F46;font-weight:bold;"
+
+            elif value >= 61:
+                return "background-color:#DBEAFE;color:#1E40AF;font-weight:bold;"
+
+            elif value >= 41:
+                return "background-color:#FEF3C7;color:#92400E;font-weight:bold;"
+
+            else:
+                return "background-color:#FEE2E2;color:#991B1B;font-weight:bold;"
+
         except:
             return ""
 
-    styled = display_df.style.applymap(
-        color_score,
-        subset=["OCR READINESS SCORE"] if "OCR READINESS SCORE" in display_df.columns else []
-    )
+    if "OCR READINESS SCORE" in display_df.columns:
 
-    st.dataframe(styled, width="stretch", hide_index=False)
-
-    # ── Download CSV ──────────────────────────────
-    csv_bytes = filtered_df.to_csv(index=False).encode()
-    st.download_button("⬇️ Download CSV", csv_bytes, "results.csv", "text/csv")
-
-    st.markdown("---")
-
-    # ── Image Preview on click ────────────────────
-    st.markdown("#### 🖼️ Image Preview")
-    st.caption("Select an image from the dropdown below to preview it:")
-
-    if len(filtered_df) > 0:
-        image_names = filtered_df["image_name"].tolist()
-        selected_img_name = st.selectbox(
-            "Select image to preview",
-            options=image_names,
-            index=0,
+        styled_df = display_df.style.map(
+            color_score,
+            subset=["OCR READINESS SCORE"]
         )
 
-        # Try to find the image in common locations
-        import glob, pathlib
-        search_dirs = [
-            os.path.dirname(os.path.abspath(__file__)),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads"),
-            os.path.join(os.path.expanduser("~"), "Downloads"),
-            os.path.join(os.path.expanduser("~"), "Desktop"),
-            os.path.join(os.path.expanduser("~"), "Pictures"),
-        ]
+    else:
 
-        found_path = None
-        for d in search_dirs:
-            candidate = os.path.join(d, selected_img_name)
-            if os.path.isfile(candidate):
-                found_path = candidate
-                break
-            # Try glob in case name has spaces
-            matches = glob.glob(os.path.join(d, "**", selected_img_name), recursive=True)
-            if matches:
-                found_path = matches[0]
-                break
+        styled_df = display_df.style
 
-        if found_path:
-            preview_img = Image.open(found_path)
-            # Get that image's scores from history
-            row = filtered_df[filtered_df["image_name"] == selected_img_name].iloc[-1]
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        hide_index=True
+    )
 
-            pc1, pc2 = st.columns([2, 1])
-            with pc1:
-                st.image(preview_img, caption=selected_img_name, width="stretch")
-            with pc2:
-                st.markdown("**Scores for this image:**")
-                score_cols = [c for c in filtered_df.columns
-                              if c.endswith("_score") and c != "ocr_readiness_score"]
-                for sc in score_cols:
-                    if sc in row and row[sc] != "" and not pd.isna(row[sc]):
-                        val = float(row[sc])
-                        color = score_color(val)
-                        label = sc.replace("_score","").replace("_"," ").title()
-                        st.markdown(
-                            f'<div style="display:flex;justify-content:space-between;'
-                            f'padding:4px 8px;border-radius:6px;margin-bottom:4px;'
-                            f'background:#F9FAFB;">'
-                            f'<span style="font-size:12px;color:#374151;">{label}</span>'
-                            f'<span style="font-size:13px;font-weight:700;color:{color};">{val}</span>'
-                            f'</div>',
-                            unsafe_allow_html=True)
-                if "ocr_readiness_score" in row:
-                    ors = float(row["ocr_readiness_score"])
-                    st.markdown(
-                        f'<div style="padding:8px 10px;border-radius:8px;margin-top:8px;'
-                        f'background:#1A2B4A;text-align:center;">'
-                        f'<div style="font-size:11px;color:#00C4B4;font-weight:600;'
-                        f'letter-spacing:0.1em;">OCR READINESS</div>'
-                        f'<div style="font-size:32px;font-weight:700;color:{score_color(ors)};">{ors}</div>'
-                        f'</div>',
-                        unsafe_allow_html=True)
-        else:
-            st.warning(
-                f"Image file **{selected_img_name}** not found on this computer. "
-                f"The score history is still available above."
+    st.download_button(
+        "⬇ Download Results CSV",
+        data=df.to_csv(index=False).encode("utf-8"),
+        file_name="results.csv",
+        mime="text/csv"
+    )
+
+    st.divider()
+
+    # ==========================================
+    # Image Preview
+    # ==========================================
+
+    st.subheader("🖼 Image Preview")
+
+    image_list = df["image_name"].tolist()
+
+    selected_image = st.selectbox(
+        "Select Image",
+        image_list
+    )
+
+    image_path = os.path.join(
+        uploads_folder,
+        selected_image
+    )
+
+    if os.path.exists(image_path):
+
+        preview = Image.open(image_path)
+
+        row = df[
+            df["image_name"] == selected_image
+        ].iloc[-1]
+
+        left, right = st.columns([2,1])
+
+        with left:
+
+            st.image(
+                preview,
+                caption=selected_image,
+                use_container_width=True
             )
+
+        with right:
+
+            st.markdown("### OCR Readiness")
+
+            score = float(row["ocr_readiness_score"])
+
+            st.markdown(
+                f"""
+                <div style="
+                background:#1A2B4A;
+                border-radius:12px;
+                padding:15px;
+                text-align:center;
+                ">
+                    <h1 style="
+                    color:{score_color(score)};
+                    margin:0;
+                    ">
+                        {score}
+                    </h1>
+
+                    <p style="
+                    color:white;
+                    margin:0;
+                    ">
+                    /100
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.write("")
+
+            factor_columns = [
+                c for c in df.columns
+                if c.endswith("_score")
+                and c != "ocr_readiness_score"
+            ]
+
+            for factor in factor_columns:
+
+                try:
+
+                    value = float(row[factor])
+
+                    st.progress(value / 100)
+
+                    st.caption(
+                        factor.replace("_score","")
+                              .replace("_"," ")
+                              .title()
+                        + f" : {value}"
+                    )
+
+                except:
+                    pass
+
+            if "ocr_confidence" in row:
+
+                st.metric(
+                    "OCR Confidence",
+                    row["ocr_confidence"]
+                )
+
+            st.metric(
+                "Timestamp",
+                str(row["timestamp"])
+            )
+
+    else:
+
+        st.error(
+            "Image not found inside uploads folder."
+        )
 
 
 # ════════════════════════════════════════════════
