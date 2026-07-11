@@ -215,16 +215,13 @@ if "card_info_open"   not in st.session_state: st.session_state.card_info_open  
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 🔍 OCR Readiness")
-    st.markdown("**SNLP Department**")
+    st.markdown("## 📄 OCR Quality Score Project")
     st.markdown("---")
 
     nav = st.radio("Navigation", [
         "🏠 Analyse Image",
-        "📊 History & Correlation",
+        "📊 History",
         "📖 About Factors",
-        "🔌 API Status",
-        "⚙️ Settings",
     ], label_visibility="collapsed")
 
     st.markdown("---")
@@ -580,14 +577,15 @@ if "🏠 Analyse Image" in nav:
 
 
 # ════════════════════════════════════════════════
-# PAGE 2 — History & Correlation
+# ════════════════════════════════════════════════
+# PAGE 2 — History
 # ════════════════════════════════════════════════
 elif "📊 History" in nav:
 
     st.markdown("""
     <div class="top-banner">
-      <h1>📊 History & Correlation Analysis</h1>
-      <p>All past analyses · CSV download · Factor vs OCR accuracy correlation</p>
+      <h1>📊 Analysis History</h1>
+      <p>All past analyses · CSV download</p>
     </div>""", unsafe_allow_html=True)
 
     df = load_results()
@@ -595,42 +593,11 @@ elif "📊 History" in nav:
         st.info("No results yet. Analyse some images first!")
         st.stop()
 
-    st.markdown(f"**{len(df)} analyses stored in results.csv**")
+    st.markdown(f"**{len(df)} analyses stored**")
     st.dataframe(df, width="stretch")
 
     csv_bytes = df.to_csv(index=False).encode()
     st.download_button("⬇️ Download CSV", csv_bytes, "results.csv", "text/csv")
-
-    st.markdown("---")
-    st.markdown("### Factor ↔ OCR Confidence Correlation")
-
-    corr = compute_correlations()
-    if corr is None:
-        st.info("Need at least 3 analyses with Tesseract data to compute correlations.")
-    else:
-        fig = go.Figure(go.Bar(
-            x=corr.values,
-            y=[DISPLAY_NAMES.get(k,k) for k in corr.index],
-            orientation="h",
-            marker=dict(color=[score_color(abs(v)*100) for v in corr.values]),
-        ))
-        fig.update_layout(
-            title="Pearson Correlation with OCR Confidence",
-            xaxis=dict(range=[-1,1], title="Correlation Coefficient"),
-            yaxis=dict(autorange="reversed"),
-            height=400,
-            paper_bgcolor="rgba(0,0,0,0)",
-        )
-        st.plotly_chart(fig, width="stretch")
-        st.caption("Closer to +1.0 means the factor is a stronger positive predictor of OCR accuracy.")
-
-        corr_df = pd.DataFrame({
-            "Factor":      [DISPLAY_NAMES.get(k,k) for k in corr.index],
-            "Correlation": [round(v,3) for v in corr.values],
-            "Strength":    ["Strong" if abs(v)>0.7 else "Moderate" if abs(v)>0.4 else "Weak"
-                            for v in corr.values],
-        })
-        st.dataframe(corr_df, width="stretch", hide_index=True)
 
 
 # ════════════════════════════════════════════════
@@ -693,156 +660,3 @@ elif "📖 About" in nav:
         "Ideal Range": v["ideal_range"].split(".")[0],
     } for k,v in FACTOR_INFO.items()]
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
-
-
-# ════════════════════════════════════════════════
-# PAGE 4 — API Status
-# ════════════════════════════════════════════════
-elif "🔌 API Status" in nav:
-
-    st.markdown("""
-    <div class="top-banner">
-      <h1>🔌 Team API Status</h1>
-      <p>Configuration · Live ping · Expected request & response formats</p>
-    </div>""", unsafe_allow_html=True)
-
-    urls = get_current_urls()
-    st.markdown("### API Configuration")
-    api_map = pd.DataFrame([
-        {"Member":"Vivek",   "Factors":"Stroke Width, Text Density",
-         "URL":urls["vivek"],   "Method":"POST", "Field":"file", "Port":"8001"},
-        {"Member":"Mansi",   "Factors":"Blur, Contrast",
-         "URL":urls["mansi"],   "Method":"POST", "Field":"file", "Port":"8000"},
-        {"Member":"Krish",   "Factors":"Matra Continuity, Zone Integrity",
-         "URL":urls["krish"],   "Method":"POST", "Field":"file", "Port":"8002"},
-        {"Member":"Tanusha", "Factors":"CC Stability, Skew Penalty",
-         "URL":urls["tanusha"], "Method":"POST", "Field":"file", "Port":"9001"},
-        {"Member":"Yash",    "Factors":"Noise, Resolution",
-         "URL":"Local (built-in)", "Method":"—", "Field":"—", "Port":"—"},
-    ])
-    st.dataframe(api_map, width="stretch", hide_index=True)
-
-    st.markdown("---")
-    st.markdown("### Live Connectivity Check")
-    if st.button("🔄 Ping All APIs Now"):
-        import requests as req
-        tests = [
-            ("Vivek",   urls["vivek"]),
-            ("Mansi",   urls["mansi"]),
-            ("Krish",   urls["krish"]),
-            ("Tanusha", urls["tanusha"]),
-        ]
-        for name, url in tests:
-            # Ping the actual API endpoint directly using HEAD/GET
-            # Do NOT strip the port — keep full URL including port number
-            try:
-                r = req.get(url, timeout=5)
-                st.success(f"**{name}** ({url}): Server reachable ✅")
-            except req.exceptions.ConnectionError:
-                st.error(f"**{name}** ({url}): Unreachable ❌ — Server not running")
-            except req.exceptions.Timeout:
-                st.error(f"**{name}** ({url}): Unreachable ❌ — Connection timed out")
-            except Exception as e:
-                # 405/422 means server IS running but endpoint needs POST not GET — that's fine!
-                if hasattr(e, 'response') and e.response is not None:
-                    st.success(f"**{name}** ({url}): Server reachable ✅")
-                else:
-                    st.error(f"**{name}** ({url}): Unreachable ❌ — {type(e).__name__}")
-
-    st.markdown("---")
-    st.markdown("### Expected Response Formats")
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.markdown("**Vivek** `POST /analyze-image`")
-        st.code('{\n  "filename": "image.png",\n  "stroke_width": 72.5,\n  "text_density": 85.1\n}', language="json")
-    with c2:
-        st.markdown("**Mansi** `POST /analyze`")
-        st.code('{\n  "blur_score": 88.0,\n  "contrast_score": 74.3\n}', language="json")
-    with c3:
-        st.markdown("**Krish** `POST /scores`")
-        st.code('{\n  "matra_continuity_score": 91.2,\n  "zone_integrity_score": 78.5\n}', language="json")
-    with c4:
-        st.markdown("**Tanusha** `POST /analyze`")
-        st.code('{\n  "connected_component_stability_score": 84.0,\n  "skew_penalty_score": 91.5\n}', language="json")
-
-    st.markdown("---")
-    st.info("ℹ️ If any API is offline during analysis, the platform automatically falls back to the local algorithm for that factor.")
-
-# ════════════════════════════════════════════════
-# PAGE 5 — Settings
-# ════════════════════════════════════════════════
-elif "⚙️ Settings" in nav:
-
-    st.markdown("""
-    <div class="top-banner">
-      <h1>⚙️ Settings — Team IP Addresses</h1>
-      <p>Update your teammates' IP addresses here — no code editing needed ever again</p>
-    </div>""", unsafe_allow_html=True)
-
-    cfg = load_config()
-
-    st.markdown("### How to find a teammate's IP address")
-    st.code("ipconfig        # Windows — look for IPv4 Address\nifconfig        # Mac / Linux", language="bash")
-    st.info("📌 Ask each teammate to run the command above and send you their **IPv4 Address** (looks like 192.168.x.x)")
-
-    st.markdown("---")
-    st.markdown("### Enter IP Addresses")
-    st.markdown("Leave as `127.0.0.1` if that person is running on **your laptop**.")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("**🟢 Vivek** — Port 8001 — Stroke Width & Text Density")
-        vivek_ip = st.text_input("Vivek's IP Address", value=cfg["vivek_ip"],
-                                  placeholder="e.g. 192.168.1.105")
-
-        st.markdown("**🟡 Mansi** — Port 8000 — Blur & Contrast")
-        mansi_ip = st.text_input("Mansi's IP Address", value=cfg["mansi_ip"],
-                                  placeholder="e.g. 192.168.1.108")
-
-    with col2:
-        st.markdown("**🔵 Krish** — Port 8002 — Matra & Zone Integrity")
-        krish_ip = st.text_input("Krish's IP Address", value=cfg["krish_ip"],
-                                  placeholder="e.g. 192.168.1.112")
-
-        st.markdown("**🩷 Tanusha** — Port 9001 — CC Stability & Skew")
-        tanusha_ip = st.text_input("Tanusha's IP Address", value=cfg["tanusha_ip"],
-                                    placeholder="e.g. 192.168.1.115")
-
-    st.markdown("---")
-    st.markdown("**Preview — URLs that will be used after saving:**")
-    preview = build_urls({
-        "vivek_ip": vivek_ip, "mansi_ip": mansi_ip,
-        "krish_ip": krish_ip, "tanusha_ip": tanusha_ip
-    })
-    for name, url in preview.items():
-        st.code(f"{name.capitalize()}: {url}")
-
-    if st.button("💾 Save IP Addresses", type="primary", width="stretch"):
-        new_cfg = {
-            "vivek_ip":   vivek_ip.strip(),
-            "mansi_ip":   mansi_ip.strip(),
-            "krish_ip":   krish_ip.strip(),
-            "tanusha_ip": tanusha_ip.strip(),
-        }
-        save_config(new_cfg)
-        st.success("✅ Saved! The app will now use these IPs automatically — no restart needed.")
-
-    st.markdown("---")
-    st.markdown("### Test Connections after Saving")
-    if st.button("🔄 Test All Connections Now", width="stretch"):
-        import requests as req
-        saved_urls = get_current_urls()
-        for name, url in saved_urls.items():
-            try:
-                r = req.get(url, timeout=5)
-                st.success(f"**{name.capitalize()}** ({url}): ✅ Reachable")
-            except req.exceptions.ConnectionError:
-                st.error(f"**{name.capitalize()}** ({url}): ❌ Server not running")
-            except req.exceptions.Timeout:
-                st.error(f"**{name.capitalize()}** ({url}): ❌ Timed out")
-            except Exception as e:
-                if hasattr(e, 'response') and e.response is not None:
-                    st.success(f"**{name.capitalize()}** ({url}): ✅ Reachable")
-                else:
-                    st.error(f"**{name.capitalize()}** ({url}): ❌ {type(e).__name__}")
