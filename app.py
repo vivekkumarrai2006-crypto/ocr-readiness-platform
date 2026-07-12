@@ -628,6 +628,12 @@ if "🏠 Analyse Image" in nav:
                 image_name
             )
 
+            temp_image_path = os.path.join(
+                os.path.dirname(__file__),
+                "uploads",
+                image_name
+            )
+
             # -----------------------------------
             # Save CSV Result
             # -----------------------------------
@@ -1184,10 +1190,10 @@ margin-bottom:0px;
             with right:
 
                 pdf_bytes = generate_pdf_report(
-                    image_name=st.image.name,
-                    factor_results=factor_results,
-                    ocr_readiness=ocr_score,
-                    ocr_confidence=ocr_confidence,
+                    image_name=st.session_state.image_name,
+                    factor_results=final_results,
+                    ocr_readiness=ocr_readiness,
+                    ocr_confidence=ocr_conf,
                     recommendations=recs,
                     image_path=temp_image_path,
                     ocr_text=ocr_text
