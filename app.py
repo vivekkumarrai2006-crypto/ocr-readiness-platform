@@ -266,15 +266,14 @@ with st.sidebar:
             st.rerun()
 
     st.markdown("---")
+
     st.markdown("### Information")
 
     if st.button("📖 About Factors", use_container_width=True):
-        st.session_state.nav = "📖 About Factors"
-        st.rerun()
+        nav = "📖 About Factors"
 
     if st.button("👥 About Team", use_container_width=True):
-        st.session_state.nav = "👥 About Team"
-        st.rerun()
+        nav = "👥 About Team"
 
 # ════════════════════════════════════════════════
 # PAGE 1 — Analyse Image
@@ -1582,11 +1581,12 @@ elif nav == "📖 About Factors":
     } for k,v in FACTOR_INFO.items()]
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
+
 # ═══════════════════════════════════════
 # PAGE 4 — About Team
 # ═══════════════════════════════════════
 
-elif "👥 About Team" in nav:
+elif nav == "👥 About Team":
 
     st.markdown("""
     <div class="top-banner">
