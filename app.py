@@ -218,11 +218,16 @@ with st.sidebar:
     st.markdown("## 📄 OCR Quality Score Project")
     st.markdown("---")
 
-    nav = st.radio("Navigation", [
-        "🏠 Analyse Image",
-        "📊 History",
-        "📖 About Factors",
-    ], label_visibility="collapsed")
+    nav = st.radio(
+        "Navigation",
+        [
+            "🏠 Analyse Image",
+            "📊 History",
+            "📖 About Factors",
+            "👥 About Team",
+        ],
+        label_visibility="collapsed"
+    )
 
     st.markdown("---")
     st.markdown("**Score Scale**")
@@ -1501,7 +1506,7 @@ elif "📊 History" in nav:
     # ════════════════════════════════════════════════
     # PAGE 3 — About Factors
     # ════════════════════════════════════════════════
-elif "📖 About" in nav:
+elif nav == "📖 About Factors":
 
     st.markdown("""
     <div class="top-banner">
@@ -1558,3 +1563,21 @@ elif "📖 About" in nav:
         "Ideal Range": v["ideal_range"].split(".")[0],
     } for k,v in FACTOR_INFO.items()]
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+
+# ==========================================================
+# PAGE 4 — ABOUT TEAM
+# ==========================================================
+
+elif nav == "👥 About Team":
+
+    st.markdown("""
+    <div class="top-banner">
+        <h1>👥 Project Team</h1>
+        <p>OCR Readiness Evaluation Platform • SNLP Department</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.info(
+        "Meet the team behind the OCR Readiness Evaluation Platform."
+    )
+
