@@ -221,10 +221,13 @@ with st.sidebar:
     st.markdown("### Navigation")
 
     nav = st.radio(
-        "",
+        "Navigation",
         [
             "🏠 Analyse Image",
-            "📊 History"
+            "📊 History",
+            "---",
+            "📖 About Factors",
+            "👥 About Team",
         ],
         label_visibility="collapsed"
     )
@@ -1574,87 +1577,115 @@ elif nav == "📖 About Factors":
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 # ═══════════════════════════════════════
-# PAGE 4 — ABOUT TEAM
+# PAGE 4 — About Team
 # ═══════════════════════════════════════
 
-elif nav == "👥 About Team":
+elif "👥 About Team" in nav:
 
     st.markdown("""
     <div class="top-banner">
-        <h1>👥 Project Team</h1>
-        <p>OCR Readiness Evaluation Platform • SNLP Department</p>
+        <h1>👥 About Team</h1>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("## Meet Our Team")
+    IMAGE_FOLDER = "team"
 
-    team = [
-
+    TEAM = [
         {
-            "Name":"Yash Rajput",
-            "Role":"Team Lead",
-            "College":"Symbiosis Skills and Professional University, Pune",
-            "Duration of internship":"2 Months",
-            "Phone":"9811518972",
-            "Photo":"team/yash.jpg"
+            "name":"Yash Rajput",
+            "role":"Team Lead",
+            "college":"Symbiosis Skills and Professional University, Pune",
+            "duration":"2 Months",
+            "phone":"9811518972",
+            "image":"yash.jpg"
         },
-
         {
-            "Name":"Vivek",
-            "Role":"Backend Developer",
-            "College":"KCC Institute of Technology and Management",
-            "Duration of internship":"2 Months",
-            "Phone":"8527890733",
-            "Photo":"team/vivek.jpg"
+            "name":"Krish",
+            "role":"Team Member",
+            "college":"Thapar Institute of Engineering and Technology",
+            "duration":"1 Month",
+            "phone":"9417976174",
+            "image":"krish.jpg"
         },
-
         {
-            "Name":"Mansi",
-            "Role":"Backend Developer",
-            "College":"Indira Gandhi Delhi Technical University for Women (IGDTUW)",
-            "Duration of internship":"6 Weeks",
-            "Phone":"9210720688",
-            "Photo":"team/mansi.jpg"
+            "name":"Vivek",
+            "role":"Team Member",
+            "college":"KCC Institute of Technology and Management",
+            "duration":"2 Months",
+            "phone":"8527890733",
+            "image":"vivek.jpg"
         },
-
         {
-            "Name":"Krish",
-            "Role":"Backend Developer",
-            "College":"Thapar Institute of Engineering and Technology",
-            "Duration of internship":"1 Month",
-            "Phone":"9417976174",
-            "Photo":"team/krish.jpg"
+            "name":"Mansi",
+            "role":"Team Member",
+            "college":"Indira Gandhi Delhi Technical University for Women (IGDTUW)",
+            "duration":"6 Weeks",
+            "phone":"9210720688",
+            "image":"mansi.jpg"
         },
-
         {
-            "Name":"Tanusha",
-            "Role":"Backend Developer",
-            "College":"Jaypee Institute of Information Technology, Noida",
-            "Duration of internship":"2 Months",
-            "Phone":"8505938377",
-            "Photo":"team/tanusha.jpg"
+            "name":"Tanusha",
+            "role":"Team Member",
+            "college":"Jaypee Institute of Information Technology, Noida Sector 62",
+            "duration":"2 Months",
+            "phone":"8505938377",
+            "image":"tanusha.jpg"
         }
-
     ]
 
-    for member in team:
+    def member_card(member):
+        path = os.path.join(IMAGE_FOLDER, member["image"])
 
-        col1, col2 = st.columns([1,3])
+        with st.container(border=True):
 
-        with col1:
+            if os.path.exists(path):
+                st.image(path, width=180)
 
-            if os.path.exists(member["photo"]):
-                st.image(member["photo"], width=170)
-            else:
-                st.image("https://placehold.co/170x210")
+            st.markdown(
+                f"<h3 style='text-align:center;color:#1A2B4A'>{member['name']}</h3>",
+                unsafe_allow_html=True
+            )
 
-        with col2:
+            st.markdown(
+                f"<p style='text-align:center;color:#00C4B4;font-weight:600'>{member['role']}</p>",
+                unsafe_allow_html=True
+            )
 
-            st.markdown(f"### {member['name']}")
-            st.markdown(f"**Role :** {member['role']}")
-            st.markdown(f"**College :** {member['college']}")
-            st.markdown(f"**Internship Duration :** {member['duration']}")
-            st.markdown(f"**Contact :** {member['phone']}")
+            st.write("🎓 **College**")
+            st.write(member["college"])
 
-        st.divider()
+            st.write("📅 **Internship Duration**")
+            st.write(member["duration"])
+
+            st.write("📞 **Contact**")
+            st.write(member["phone"])
+
+    st.markdown("## Team Lead")
+
+    c1, c2, c3 = st.columns([1,2,1])
+
+    with c2:
+        member_card(TEAM[0])
+
+    st.markdown("---")
+
+    st.markdown("## Team Members")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        member_card(TEAM[1])
+
+    with col2:
+        member_card(TEAM[2])
+
+    st.markdown("")
+
+    col3, col4 = st.columns(2)
+
+    with col3:
+        member_card(TEAM[3])
+
+    with col4:
+        member_card(TEAM[4])
 
