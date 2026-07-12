@@ -218,13 +218,13 @@ with st.sidebar:
     st.markdown("## 📄 OCR Quality Score Project")
     st.markdown("---")
 
+    st.markdown("### Navigation")
+
     nav = st.radio(
-        "Navigation",
+        "",
         [
             "🏠 Analyse Image",
-            "📊 History",
-            "📖 About Factors",
-            "👥 About Team",
+            "📊 History"
         ],
         label_visibility="collapsed"
     )
@@ -256,6 +256,15 @@ with st.sidebar:
                         "ocr_conf","ocr_text","image_name","raw_pil","analysis_img","recs"]:
                 st.session_state[key] = False if key=="analysis_done" else ({} if "results" in key or "status" in key else (None if key in ["ocr_conf","raw_pil","analysis_img"] else ([] if key=="recs" else "")))
             st.rerun()
+
+    st.markdown("---")
+    st.markdown("### Information")
+
+    if st.button("📖 About Factors", use_container_width=True):
+        nav = "📖 About Factors"
+
+    if st.button("👥 About Team", use_container_width=True):
+        nav = "👥 About Team"
 
 
 # ════════════════════════════════════════════════
@@ -1564,9 +1573,9 @@ elif nav == "📖 About Factors":
     } for k,v in FACTOR_INFO.items()]
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
-# ==========================================================
+# ═══════════════════════════════════════
 # PAGE 4 — ABOUT TEAM
-# ==========================================================
+# ═══════════════════════════════════════
 
 elif nav == "👥 About Team":
 
@@ -1577,7 +1586,75 @@ elif nav == "👥 About Team":
     </div>
     """, unsafe_allow_html=True)
 
-    st.info(
-        "Meet the team behind the OCR Readiness Evaluation Platform."
-    )
+    st.markdown("## Meet Our Team")
+
+    team = [
+
+        {
+            "Photo":"team/yash.jpg"
+            "Name":"Yash Rajput",
+            "Role":"Team Lead",
+            "College":"Symbiosis Skills and Professional University, Pune",
+            "Duration of internship":"2 Months",
+            "Phone":"9811518972",
+        },
+
+        {
+            "name":"Vivek",
+            "role":"Backend Developer",
+            "college":"KCC Institute of Technology and Management",
+            "duration":"2 Months",
+            "phone":"8527890733",
+            "photo":"team/vivek.jpg"
+        },
+
+        {
+            "name":"Mansi",
+            "role":"Backend Developer",
+            "college":"Indira Gandhi Delhi Technical University for Women (IGDTUW)",
+            "duration":"6 Weeks",
+            "phone":"9210720688",
+            "photo":"team/mansi.jpg"
+        },
+
+        {
+            "name":"Krish",
+            "role":"Backend Developer",
+            "college":"Thapar Institute of Engineering and Technology",
+            "duration":"1 Month",
+            "phone":"9417976174",
+            "photo":"team/krish.jpg"
+        },
+
+        {
+            "name":"Tanusha",
+            "role":"Backend Developer",
+            "college":"Jaypee Institute of Information Technology, Noida",
+            "duration":"2 Months",
+            "phone":"8505938377",
+            "photo":"team/tanusha.jpg"
+        }
+
+    ]
+
+    for member in team:
+
+        col1, col2 = st.columns([1,3])
+
+        with col1:
+
+            if os.path.exists(member["photo"]):
+                st.image(member["photo"], width=170)
+            else:
+                st.image("https://placehold.co/170x210")
+
+        with col2:
+
+            st.markdown(f"### {member['name']}")
+            st.markdown(f"**Role :** {member['role']}")
+            st.markdown(f"**College :** {member['college']}")
+            st.markdown(f"**Internship Duration :** {member['duration']}")
+            st.markdown(f"**Contact :** {member['phone']}")
+
+        st.divider()
 
