@@ -560,40 +560,27 @@ analysis_img = st.session_state.analysis_img
 st.markdown("---")
 st.markdown("## 🚀 Step 2 • Analyse Image")
 
-st.markdown("""
-<div style="
-background:#F8FAFC;
-padding:22px;
-border-radius:12px;
-border-left:5px solid #00C4B4;
-margin-bottom:20px;
-">
+with st.container(border=True):
 
-<h4 style="margin-top:0;color:#1A2B4A;">
-🚀 Ready to Analyse
-</h4>
+    st.subheader("🚀 Ready to Analyse")
 
-<p style="font-size:15px;color:#374151;line-height:1.8;">
+    st.write(
+        "Click the **Analyse Image** button below to begin the OCR Readiness Evaluation."
+    )
 
-Click the button below to evaluate your uploaded document.
+    st.markdown("""
+### The platform will automatically
 
-<br><br>
+- ✅ Analyse all **10 OCR Quality Factors**
+- ✅ Calculate the **OCR Readiness Score**
+- ✅ Estimate **OCR Confidence**
+- ✅ Generate **Personalized Recommendations**
+- ✅ Save this analysis into **History**
+- ✅ Generate a **Professional PDF Report**
 
-<b>The platform will automatically:</b>
-
-<ul>
-<li>Calculate all 10 OCR Quality Factors</li>
-<li>Compute the OCR Readiness Score</li>
-<li>Estimate OCR Confidence</li>
-<li>Generate Improvement Recommendations</li>
-<li>Save this analysis into History</li>
-<li>Create a Professional PDF Report</li>
-</ul>
-
-</p>
-
-</div>
-""", unsafe_allow_html=True)
+---
+Once the analysis is complete, detailed factor scores, OCR text, and improvement suggestions will be displayed automatically.
+""")
 
 analyse = st.button(
     "🚀 Analyse Image",
@@ -1045,34 +1032,63 @@ if st.session_state.analysis_done:
 
     with tab2:
 
-        st.subheader("Recommendations")
+        st.subheader("💡 OCR Improvement Recommendations")
 
-        if len(recs) == 0:
+    # Remove empty recommendations
+    recs = [
+        r.strip()
+        for r in recs
+        if isinstance(r, str) and r.strip()
+    ]
 
-            st.success(
-                "No recommendations. Image quality is excellent."
-            )
+    if not recs:
 
-        else:
+        st.success("🎉 Excellent Image Quality")
 
-            for rec in recs:
+        st.markdown("""
+Your uploaded document already satisfies the recommended OCR quality standards.
 
-                st.markdown(
-                    f"""
-    <div style="
-    background:#F8FAFC;
-    border-left:5px solid #00C4B4;
-    padding:15px;
-    margin-bottom:10px;
-    border-radius:10px;
-    ">
+### No improvements are required.
 
-    {rec}
+You can directly use this image for OCR processing with a high probability of obtaining accurate text extraction.
+""")
 
-    </div>
-    """,
-                    unsafe_allow_html=True
-                )
+    else:
+
+        st.info(
+            f"{len(recs)} recommendation(s) generated for improving OCR accuracy."
+        )
+
+        for i, rec in enumerate(recs, start=1):
+
+            st.markdown(f"""
+<div style="
+background:#F8FAFC;
+border-left:6px solid #00C4B4;
+padding:18px;
+border-radius:12px;
+margin-bottom:15px;
+">
+
+<h4 style="margin-bottom:10px;color:#1A2B4A;">
+Recommendation {i}
+</h4>
+
+<p style="
+font-size:15px;
+line-height:1.8;
+color:#374151;
+margin-bottom:0px;
+">
+{rec}
+</p>
+
+</div>
+""", unsafe_allow_html=True)
+
+        st.success(
+            "✔ Apply the above suggestions and re-analyse the image for improved OCR performance."
+        )
 
     # ======================================================
     # TAB 3
