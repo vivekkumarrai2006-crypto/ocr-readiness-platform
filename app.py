@@ -563,29 +563,34 @@ st.markdown("## 🚀 Step 2 • Analyse Image")
 st.markdown("""
 <div style="
 background:#F8FAFC;
-padding:18px;
+padding:22px;
 border-radius:12px;
 border-left:5px solid #00C4B4;
 margin-bottom:20px;
 ">
 
-<b>Ready to Analyse</b><br><br>
+<h4 style="margin-top:0;color:#1A2B4A;">
+🚀 Ready to Analyse
+</h4>
 
-Click the button below to evaluate your document.
+<p style="font-size:15px;color:#374151;line-height:1.8;">
 
-The platform will automatically
+Click the button below to evaluate your uploaded document.
 
-• Calculate all 10 OCR Quality Factors
+<br><br>
 
-• Compute the OCR Readiness Score
+<b>The platform will automatically:</b>
 
-• Estimate OCR Confidence
+<ul>
+<li>Calculate all 10 OCR Quality Factors</li>
+<li>Compute the OCR Readiness Score</li>
+<li>Estimate OCR Confidence</li>
+<li>Generate Improvement Recommendations</li>
+<li>Save this analysis into History</li>
+<li>Create a Professional PDF Report</li>
+</ul>
 
-• Generate Improvement Recommendations
-
-• Save this analysis into History
-
-• Create a downloadable PDF Report
+</p>
 
 </div>
 """, unsafe_allow_html=True)
@@ -1002,36 +1007,17 @@ if st.session_state.analysis_done:
 
     st.markdown("---")
 
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📊 Radar Chart",
-        "📄 OCR Text",
-        "💡 Recommendations",
-        "📘 Factor Details"
-    ])
+    tab1, tab2, tab3 = st.tabs([
+    "📄 OCR Text",
+    "💡 Recommendations",
+    "📘 Factor Details"
+])
 
     # ======================================================
     # TAB 1
     # ======================================================
 
     with tab1:
-
-        st.subheader("OCR Quality Radar Chart")
-
-        st.plotly_chart(
-            make_radar(final_results),
-            use_container_width=True
-        )
-
-        st.info(
-            "The radar chart compares all 10 OCR quality factors. "
-            "A larger polygon indicates better OCR readiness."
-        )
-
-    # ======================================================
-    # TAB 2
-    # ======================================================
-
-    with tab2:
 
         st.subheader("OCR Text Extraction")
 
@@ -1054,10 +1040,10 @@ if st.session_state.analysis_done:
         )
 
     # ======================================================
-    # TAB 3
+    # TAB 2
     # ======================================================
 
-    with tab3:
+    with tab2:
 
         st.subheader("Recommendations")
 
@@ -1089,10 +1075,10 @@ if st.session_state.analysis_done:
                 )
 
     # ======================================================
-    # TAB 4
+    # TAB 3
     # ======================================================
 
-    with tab4:
+    with tab3:
 
         st.subheader("Detailed Factor Information")
 
