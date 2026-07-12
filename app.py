@@ -1644,9 +1644,15 @@ elif nav == "👥 About Team":
 
         with st.container(border=True):
 
-            if os.path.exists(member["image"]):
+            path = os.path.join(
+                os.path.dirname(__file__),
+                IMAGE_FOLDER,
+                member["image"]
+            )
 
-                img = Image.open(member["image"])
+            if os.path.exists(path):
+
+                img = Image.open(path)
 
                 w, h = img.size
                 side = min(w, h)
