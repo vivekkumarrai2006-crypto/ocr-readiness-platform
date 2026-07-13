@@ -426,8 +426,8 @@ def generate_pdf_report(
 
         img = Image(image_path)
 
-        max_width = 15 * cm
-        max_height = 9 * cm
+        max_width = 13.5 * cm
+        max_height = 6 * cm
 
         ratio = min(
             max_width / img.drawWidth,
