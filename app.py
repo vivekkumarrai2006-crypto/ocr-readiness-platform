@@ -38,6 +38,9 @@ try:
 except ImportError:
     CROPPER_OK = False
 
+if "nav" not in st.session_state:
+    st.session_state.nav = "🏠 Analyse Image"
+
 # ── Page config ─────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="OCR Readiness Platform",
