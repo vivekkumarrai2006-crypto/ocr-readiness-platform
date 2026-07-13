@@ -558,6 +558,12 @@ if nav == "🏠 Analyse Image":
         st.markdown("---")
         st.markdown("## 🚀 Step 2 • Analyse Image")
 
+        st.info(
+            """
+        The platform will evaluate all **10 OCR Quality Factors**, calculate the **OCR Readiness Score**, estimate **OCR Confidence**, generate personalized improvement recommendations, and prepare a professional PDF report based on the uploaded document.
+        """
+        )
+
         with st.container():
             st.markdown("""
             <div style="
