@@ -1650,16 +1650,6 @@ elif nav == "👥 About Team":
                 member["image"]
             )
 
-            st.write("Current folder:", os.path.dirname(__file__))
-            st.write("Files in team folder:")
-
-            team_path = os.path.join(os.path.dirname(__file__), "team")
-
-            if os.path.exists(team_path):
-                st.write(os.listdir(team_path))
-            else:
-                st.error("Team folder not found!")
-
             if os.path.exists(path):
 
                 img = Image.open(path)
