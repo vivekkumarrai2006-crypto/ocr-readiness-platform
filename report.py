@@ -762,18 +762,9 @@ def generate_pdf_report(
             .replace("\n", "<br/>")
         )
 
-        if ocr_text and ocr_text.strip():
+        lines = safe_text.split("\n")
 
-            safe_text = (
-                ocr_text
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-            )
-
-            lines = safe_text.split("\n")
-
-            for line in lines:
+        for line in lines:
 
                 story.append(
                     Paragraph(line, normal_style)
