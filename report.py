@@ -762,37 +762,26 @@ def generate_pdf_report(
             .replace("\n", "<br/>")
         )
 
-        text_table = Table(
-            [[
-                Paragraph(
-                    safe_text,
-                    normal_style
+        if ocr_text and ocr_text.strip():
+
+            safe_text = (
+                ocr_text
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            )
+
+            lines = safe_text.split("\n")
+
+            for line in lines:
+
+                story.append(
+                    Paragraph(line, normal_style)
                 )
-            ]],
-            colWidths=[16.2 * cm]
-        )
 
-        text_table.setStyle(
-
-            TableStyle([
-
-                ("BACKGROUND", (0, 0), (-1, -1), WHITE),
-
-                ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#D9D9D9")),
-
-                ("LEFTPADDING", (0, 0), (-1, -1), 12),
-
-                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
-
-                ("TOPPADDING", (0, 0), (-1, -1), 12),
-
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
-
-            ])
-
-        )
-
-        story.append(text_table)
+                story.append(
+                    Spacer(1, 2)
+                )
 
     else:
 
