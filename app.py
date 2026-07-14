@@ -190,18 +190,20 @@ with st.sidebar:
 
     st.markdown("### Navigation")
 
-    page = st.radio(
+    radio_page = st.radio(
         "Navigation",
         [
             "🏠 Analyse Image",
             "📊 History"
         ],
-        index=0 if st.session_state.nav == "🏠 Analyse Image" else 1,
+        index=0 if st.session_state.nav == "📊 History" else 0,
         label_visibility="collapsed"
     )
 
-    if page != st.session_state.nav and page in ["🏠 Analyse Image", "📊 History"]:
-        st.session_state.nav = page
+    # Only update nav when one of the radio pages is selected
+    if radio_page != st.session_state.nav:
+        if radio_page in ["🏠 Analyse Image", "📊 History"]:
+            st.session_state.nav = radio_page
 
     nav = st.session_state.nav
 
