@@ -190,20 +190,25 @@ with st.sidebar:
 
     st.markdown("### Navigation")
 
+    RADIO_OPTIONS = ["🏠 Analyse Image", "📊 History"]
+
+    if "nav_radio" not in st.session_state:
+        st.session_state.nav_radio = "🏠 Analyse Image"
+
     radio_page = st.radio(
         "Navigation",
-        [
-            "🏠 Analyse Image",
-            "📊 History"
-        ],
-        index=0 if st.session_state.nav == "📊 History" else 0,
+        RADIO_OPTIONS,
+        key="nav_radio",
         label_visibility="collapsed"
     )
 
-    # Only update nav when one of the radio pages is selected
-    if radio_page != st.session_state.nav:
-        if radio_page in ["🏠 Analyse Image", "📊 History"]:
-            st.session_state.nav = radio_page
+    # Only treat this as a real navigation action if the radio's value actually
+    # changed since last run (i.e. the user clicked it). Otherwise, on reruns
+    # triggered by the "About Factors"/"About Team" buttons, the radio would
+    # keep re-reporting its own last value and clobber st.session_state.nav.
+    if radio_page != st.session_state.get("_last_radio_page", radio_page):
+        st.session_state.nav = radio_page
+    st.session_state["_last_radio_page"] = radio_page
 
     nav = st.session_state.nav
 
@@ -1709,4 +1714,3 @@ elif nav == "👥 About Team":
 
     with col4:
         member_card(TEAM[4])
-
