@@ -26,7 +26,7 @@ try:
     import pytesseract
     # Only needed on Windows if tesseract isn't on PATH.
     # On Streamlit Cloud (Linux), apt-installed tesseract is already on PATH — leave this commented.
-    # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
     try:
         pytesseract.get_tesseract_version()
         TESSERACT_OK = True
