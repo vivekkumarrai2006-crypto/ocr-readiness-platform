@@ -247,6 +247,8 @@ with st.sidebar:
         st.session_state.nav = "👥 About Team"
         st.rerun()
 
+    nav = st.session_state.nav
+
 # ════════════════════════════════════════════════
 # PAGE 1 — Analyse Image
 # ════════════════════════════════════════════════
