@@ -1,201 +1,903 @@
 """
-PDF report generator for OCR Readiness Platform.
-Uses reportlab to produce a clean single-page report.
+Professional OCR Readiness Report Generator
+OCR Readiness Evaluation Platform
 """
 
 import io
+import os
 from datetime import datetime
-from typing import Dict, Any, Optional, List
 
-from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
-from reportlab.lib.units import cm
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-)
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    HRFlowable,
+    Image,
+    PageBreak,
+)
 
 from factors import DISPLAY_NAMES, WEIGHTS
 
 
-# Brand colours
-NAVY    = colors.HexColor("#1A2B4A")
-TEAL    = colors.HexColor("#00C4B4")
-LIGHT   = colors.HexColor("#F5F7FA")
-WARN    = colors.HexColor("#F59E0B")
-GOOD    = colors.HexColor("#10B981")
-BAD     = colors.HexColor("#EF4444")
-MID     = colors.HexColor("#F59E0B")
+# ==========================================================
+# THEME COLORS
+# ==========================================================
+
+NAVY = colors.HexColor("#1A2B4A")
+DARK = colors.HexColor("#10203F")
+TEAL = colors.HexColor("#00C4B4")
+LIGHT = colors.HexColor("#F8FAFC")
+LIGHT_GREY = colors.HexColor("#EEF2F7")
+GREY = colors.HexColor("#6B7280")
+WHITE = colors.white
+
+GREEN = colors.HexColor("#10B981")
+BLUE = colors.HexColor("#3B82F6")
+ORANGE = colors.HexColor("#F59E0B")
+RED = colors.HexColor("#EF4444")
 
 
-def _status_color(score: float) -> colors.Color:
+# ==========================================================
+# SCORE COLOR
+# ==========================================================
+
+def score_color(score):
+
     if score >= 81:
-        return GOOD
-    elif score >= 61:
-        return TEAL
-    elif score >= 41:
-        return WARN
-    return BAD
+        return GREEN
 
+    elif score >= 61:
+        return BLUE
+
+    elif score >= 41:
+        return ORANGE
+
+    return RED
+
+
+# ==========================================================
+# FORMAT PERCENTAGE
+# ==========================================================
+
+def format_percent(value):
+
+    if value is None:
+        return "Not Available"
+
+    try:
+        return f"{float(value):.1f}%"
+    except Exception:
+        return str(value)
+
+
+# ==========================================================
+# FOOTER
+# ==========================================================
+
+def draw_footer(canvas, doc):
+
+    canvas.saveState()
+
+    canvas.setStrokeColor(TEAL)
+    canvas.setLineWidth(0.5)
+
+    canvas.line(
+        1.5 * cm,
+        1.5 * cm,
+        19 * cm,
+        1.5 * cm
+    )
+
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(GREY)
+
+    canvas.drawString(
+        1.7 * cm,
+        1 * cm,
+        "OCR Readiness Evaluation Platform"
+    )
+
+    canvas.drawRightString(
+        19 * cm,
+        1 * cm,
+        f"Page {doc.page}"
+    )
+
+    canvas.restoreState()
+
+
+# ==========================================================
+# MAIN FUNCTION
+# ==========================================================
 
 def generate_pdf_report(
-    image_name: str,
-    factor_results: Dict[str, Any],
-    ocr_readiness: float,
-    ocr_confidence: Optional[float],
-    recommendations: List[str],
-) -> bytes:
-    buf = io.BytesIO()
+        image_name,
+        factor_results,
+        ocr_readiness,
+        ocr_confidence,
+        recommendations,
+        image_path=None,
+        ocr_text=""
+):
+
+    buffer = io.BytesIO()
+
     doc = SimpleDocTemplate(
-        buf,
+        buffer,
         pagesize=A4,
-        leftMargin=2*cm,
-        rightMargin=2*cm,
-        topMargin=2*cm,
-        bottomMargin=2*cm,
+        leftMargin=1.4 * cm,
+        rightMargin=1.4 * cm,
+        topMargin=1.5 * cm,
+        bottomMargin=1.7 * cm
     )
 
     styles = getSampleStyleSheet()
+
     title_style = ParagraphStyle(
         "Title",
-        parent=styles["Title"],
-        fontSize=20,
-        textColor=NAVY,
-        spaceAfter=4,
-        alignment=TA_CENTER,
+        parent=styles["Heading1"],
         fontName="Helvetica-Bold",
-    )
-    sub_style = ParagraphStyle(
-        "Sub",
-        parent=styles["Normal"],
-        fontSize=9,
-        textColor=colors.grey,
+        fontSize=24,
         alignment=TA_CENTER,
-        spaceAfter=12,
-    )
-    section_style = ParagraphStyle(
-        "Section",
-        parent=styles["Normal"],
-        fontSize=12,
         textColor=NAVY,
-        spaceBefore=14,
-        spaceAfter=6,
-        fontName="Helvetica-Bold",
+        spaceAfter=6
     )
-    body_style = ParagraphStyle(
-        "Body",
-        parent=styles["Normal"],
-        fontSize=9,
-        textColor=colors.HexColor("#333333"),
-        spaceAfter=4,
+
+    subtitle_style = ParagraphStyle(
+        "Subtitle",
+        parent=styles["BodyText"],
+        alignment=TA_CENTER,
+        textColor=GREY,
+        fontSize=11,
+        spaceAfter=2
+    )
+
+    heading_style = ParagraphStyle(
+        "Heading",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=16,
+        textColor=NAVY,
+        spaceBefore=12,
+        spaceAfter=8
+    )
+
+    normal_style = ParagraphStyle(
+        "Normal",
+        parent=styles["BodyText"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=17,
+        textColor=colors.black
+    )
+
+    center_style = ParagraphStyle(
+        "Center",
+        parent=normal_style,
+        alignment=TA_CENTER
+    )
+
+    footer_style = ParagraphStyle(
+        "Footer",
+        parent=normal_style,
+        alignment=TA_CENTER,
+        fontSize=8,
+        textColor=GREY
     )
 
     story = []
 
-    # ── Header ──────────────────────────────────
-    story.append(Paragraph("OCR Readiness Evaluation Report", title_style))
-    story.append(Paragraph(
-        f"Image: <b>{image_name}</b> &nbsp;|&nbsp; "
-        f"Generated: {datetime.now().strftime('%d %b %Y, %H:%M')} &nbsp;|&nbsp; "
-        f"SNLP Department",
-        sub_style,
-    ))
-    story.append(HRFlowable(width="100%", thickness=2, color=TEAL, spaceAfter=10))
+    # ==========================================================
+    # COVER PAGE
+    # ==========================================================
 
-    # ── OCR Readiness Score ──────────────────────
-    status = factor_results.get("ocr_readiness_status", "—")
-    story.append(Paragraph("OCR Readiness Score", section_style))
+    story.append(Spacer(1, 10))
 
-    score_data = [
-        [
-            Paragraph(f"<font size=28 color='#{NAVY.hexval()[2:]}' name='Helvetica-Bold'>"
-                      f"{ocr_readiness}/100</font>", body_style),
-            Paragraph(
-                f"<font size=14 color='#{_status_color(ocr_readiness).hexval()[2:]}' "
-                f"name='Helvetica-Bold'>{status}</font>",
-                body_style,
+    story.append(
+        Paragraph(
+            "OCR Readiness Evaluation Report",
+            title_style
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "AI-Based OCR Image Quality Assessment Platform",
+            subtitle_style
+        )
+    )
+
+    story.append(
+        Paragraph(
+            datetime.now().strftime(
+                "Generated on %d %B %Y • %I:%M %p"
             ),
-        ]
+            subtitle_style
+        )
+    )
+
+    story.append(Spacer(1, 8))
+
+    story.append(
+        HRFlowable(
+            width="100%",
+            thickness=2,
+            color=TEAL
+        )
+    )
+
+    story.append(Spacer(1, 18))
+
+    # ==========================================================
+    # IMAGE INFORMATION
+    # ==========================================================
+
+    info_data = [
+
+        ["Image Name", image_name],
+
+        ["OCR Readiness Score",
+         f"{ocr_readiness:.1f} / 100"],
+
+        ["OCR Confidence",
+         format_percent(ocr_confidence)],
+
+        ["Overall Status",
+         factor_results.get(
+             "ocr_readiness_status",
+             "-"
+         )],
+
+        ["Report Generated",
+         datetime.now().strftime(
+             "%d %B %Y  %I:%M %p"
+         )]
+
     ]
-    score_table = Table(score_data, colWidths=["50%", "50%"])
-    score_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
-        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [LIGHT]),
-        ("BOX", (0, 0), (-1, -1), 1, TEAL),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-        ("LEFTPADDING", (0, 0), (-1, -1), 12),
-    ]))
+
+    info_table = Table(
+        info_data,
+        colWidths=[5 * cm, 11.2 * cm]
+    )
+
+    info_table.setStyle(
+
+        TableStyle([
+
+            ("BACKGROUND", (0, 0), (0, -1), NAVY),
+
+            ("TEXTCOLOR", (0, 0), (0, -1), WHITE),
+
+            ("BACKGROUND", (1, 0), (1, -1), LIGHT),
+
+            ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D7DCE2")),
+
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+
+            ("TOPPADDING", (0, 0), (-1, -1), 9),
+
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+
+        ])
+
+    )
+
+    story.append(info_table)
+
+    story.append(Spacer(1, 18))
+
+
+    # ==========================================================
+    # OCR SUMMARY CARDS
+    # ==========================================================
+
+    colour = score_color(ocr_readiness)
+
+    score_table = Table(
+
+        [[
+
+            Paragraph(
+
+                f"""
+
+                <para align="center">
+
+                <font size="13" color="#6B7280">
+
+                OCR Readiness
+
+                </font>
+
+                <br/><br/>
+
+                <font size="38" color="{colour.hexval()}">
+
+                <b>{ocr_readiness:.1f}</b>
+
+                </font>
+
+                <br/><br/>
+
+                <font size="13">
+
+                {factor_results.get("ocr_readiness_status","")}
+
+                </font>
+
+                </para>
+
+                """,
+
+                center_style
+
+            ),
+
+            Paragraph(
+
+                f"""
+
+                <para align="center">
+
+                <font size="13" color="#6B7280">
+
+                OCR Confidence
+
+                </font>
+
+                <br/><br/>
+
+                <font size="38" color="#3B82F6">
+
+                <b>{format_percent(ocr_confidence)}</b>
+
+                </font>
+
+                <br/><br/>
+
+                <font size="12">
+
+                Tesseract OCR Result
+
+                </font>
+
+                </para>
+
+                """,
+
+                center_style
+
+            )
+
+        ]],
+
+        colWidths=[8.1 * cm, 8.1 * cm]
+
+    )
+
+    score_table.setStyle(
+
+        TableStyle([
+
+            ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
+
+            ("BOX", (0, 0), (-1, -1), 1, TEAL),
+
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D9D9D9")),
+
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 18),
+
+            ("TOPPADDING", (0, 0), (-1, -1), 18),
+
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+
+        ])
+
+    )
+
     story.append(score_table)
-    story.append(Spacer(1, 6))
 
-    if ocr_confidence is not None:
-        diff = abs(ocr_readiness - ocr_confidence)
-        story.append(Paragraph(
-            f"Tesseract OCR Confidence: <b>{ocr_confidence:.1f}%</b> &nbsp;|&nbsp; "
-            f"Predicted vs Actual gap: <b>{diff:.1f}%</b>",
-            body_style,
-        ))
+    story.append(Spacer(1, 20))
 
-    # ── Factor Scores Table ──────────────────────
-    story.append(Paragraph("Factor Scores", section_style))
+    # ==========================================================
+    # UPLOADED DOCUMENT
+    # ==========================================================
 
-    header = ["Factor", "Score", "Status", "Weight", "Description"]
-    table_data = [header]
+    if image_path and os.path.exists(image_path):
+
+        story.append(
+            Paragraph(
+                "Uploaded Document",
+                heading_style
+            )
+        )
+
+        img = Image(image_path)
+
+        max_width = 13.5 * cm
+        max_height = 6 * cm
+
+        ratio = min(
+            max_width / img.drawWidth,
+            max_height / img.drawHeight
+        )
+
+        img.drawWidth *= ratio
+        img.drawHeight *= ratio
+
+        image_table = Table(
+            [[img]],
+            colWidths=[16.2 * cm]
+        )
+
+        image_table.setStyle(
+
+            TableStyle([
+
+                ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#D9D9D9")),
+
+                ("BACKGROUND", (0, 0), (-1, -1), WHITE),
+
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+
+                ("TOPPADDING", (0, 0), (-1, -1), 12),
+
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+
+            ])
+
+        )
+
+        story.append(image_table)
+
+        story.append(Spacer(1, 18))
+
+
+    # ==========================================================
+    # NEXT PAGE
+    # ==========================================================
+
+    story.append(PageBreak())
+
+
+    # ==========================================================
+    # OCR QUALITY FACTOR SCORES
+    # ==========================================================
+
+    story.append(
+
+        Paragraph(
+
+            "OCR Quality Factor Scores",
+
+            heading_style
+
+        )
+
+    )
+
+    table_data = [
+
+        [
+
+            "Quality Factor",
+
+            "Score",
+
+            "Status",
+
+            "Weight"
+
+        ]
+
+    ]
+
     for key, display in DISPLAY_NAMES.items():
-        r = factor_results.get(key, {})
-        sc = r.get("score", "—")
-        st = r.get("status", "—")
-        wt = f"{int(WEIGHTS[key]*100)}%"
-        desc = r.get("description", "")[:60] + ("…" if len(r.get("description","")) > 60 else "")
-        table_data.append([display, f"{sc}", st, wt, desc])
 
-    col_widths = [3.2*cm, 1.5*cm, 2.0*cm, 1.5*cm, 8.0*cm]
-    factor_table = Table(table_data, colWidths=col_widths)
+        result = factor_results.get(key, {})
 
-    ts = TableStyle([
+        score = float(
+            result.get("score", 0)
+        )
+
+        status = result.get(
+            "status",
+            "-"
+        )
+
+        weight = f"{WEIGHTS[key] * 100:.0f}%"
+
+        table_data.append([
+
+            display,
+
+            f"{score:.1f}",
+
+            status,
+
+            weight
+
+        ])
+
+    factor_table = Table(
+        table_data,
+        colWidths=[8 * cm, 2.5 * cm, 3.5 * cm, 2 * cm]
+    )
+
+    factor_style = TableStyle([
+
+        # Header
         ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CCCCCC")),
+        ("FONTSIZE", (0, 0), (-1, 0), 11),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("ALIGN", (1, 0), (3, -1), "CENTER"),
+
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D8D8D8")),
+
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 9),
+
     ])
 
-    # Colour-code score column
-    for i, key in enumerate(DISPLAY_NAMES.keys(), start=1):
-        sc = factor_results.get(key, {}).get("score", 50)
-        c = _status_color(float(sc))
-        ts.add("TEXTCOLOR", (1, i), (1, i), c)
-        ts.add("FONTNAME",  (1, i), (1, i), "Helvetica-Bold")
-        ts.add("TEXTCOLOR", (2, i), (2, i), c)
+    # Alternate Row Background
+    for row in range(1, len(table_data)):
 
-    factor_table.setStyle(ts)
-    story.append(factor_table)
+        if row % 2 == 0:
+            bg = WHITE
+        else:
+            bg = LIGHT
 
-    # ── Recommendations ──────────────────────────
-    story.append(Paragraph("Recommendations", section_style))
-    for rec in recommendations:
-        # strip markdown bold markers for PDF
-        clean = rec.replace("**", "").replace("🔧", "▸").replace("✅", "✓")
-        story.append(Paragraph(clean, body_style))
+        factor_style.add(
+            "BACKGROUND",
+            (0, row),
+            (-1, row),
+            bg
+        )
 
-    # ── Footer ───────────────────────────────────
-    story.append(Spacer(1, 12))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
-    story.append(Paragraph(
-        "OCR Readiness Evaluation Platform · SNLP Department · "
-        "Team: Yash (Lead), Vivek, Mansi, Krish",
-        ParagraphStyle("Footer", parent=body_style, textColor=colors.grey,
-                       alignment=TA_CENTER, fontSize=7),
-    ))
+    # Score Colors
+    for row, key in enumerate(DISPLAY_NAMES.keys(), start=1):
 
-    doc.build(story)
-    return buf.getvalue()
+        score = factor_results.get(
+            key,
+            {}
+        ).get(
+            "score",
+            0
+        )
+
+        clr = score_color(score)
+
+        factor_style.add(
+            "TEXTCOLOR",
+            (1, row),
+            (2, row),
+            clr
+        )
+
+        factor_style.add(
+            "FONTNAME",
+            (1, row),
+            (2, row),
+            "Helvetica-Bold"
+        )
+
+    factor_table.setStyle(
+        factor_style
+    )
+
+    story.append(
+        factor_table
+    )
+
+    story.append(
+        Spacer(1, 20)
+    )
+
+
+    # ==========================================================
+    # RECOMMENDATIONS
+    # ==========================================================
+
+    story.append(
+        Paragraph(
+            "Recommendations",
+            heading_style
+        )
+    )
+
+    if recommendations:
+
+        for index, recommendation in enumerate(
+                recommendations,
+                start=1
+        ):
+
+            recommendation = (
+                recommendation
+                .replace("**", "")
+                .replace("🔧", "")
+                .replace("✅", "")
+            )
+
+            card = Table(
+
+                [[
+
+                    Paragraph(
+
+                        f"""
+                        <b>Recommendation {index}</b>
+
+                        <br/><br/>
+
+                        {recommendation}
+                        """,
+
+                        normal_style
+
+                    )
+
+                ]],
+
+                colWidths=[16.2 * cm]
+
+            )
+
+            card.setStyle(
+
+                TableStyle([
+
+                    ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
+
+                    ("BOX", (0, 0), (-1, -1), 1, TEAL),
+
+                    ("LEFTPADDING", (0, 0), (-1, -1), 14),
+
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+
+                    ("TOPPADDING", (0, 0), (-1, -1), 12),
+
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+
+                ])
+
+            )
+
+            story.append(card)
+
+            story.append(
+                Spacer(1, 10)
+            )
+
+    else:
+
+        success = Table(
+
+            [[
+
+                Paragraph(
+
+                    """
+                    <b>Excellent!</b>
+
+                    <br/><br/>
+
+                    No recommendations are required.
+                    The uploaded image already satisfies the
+                    recommended OCR quality standards.
+                    """,
+
+                    normal_style
+
+                )
+
+            ]],
+
+            colWidths=[16.2 * cm]
+
+        )
+
+        success.setStyle(
+
+            TableStyle([
+
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#ECFDF5")),
+
+                ("BOX", (0, 0), (-1, -1), 1, GREEN),
+
+                ("LEFTPADDING", (0, 0), (-1, -1), 14),
+
+                ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+
+                ("TOPPADDING", (0, 0), (-1, -1), 14),
+
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+
+            ])
+
+        )
+
+        story.append(success)
+
+    story.append(
+        Spacer(1, 20)
+    )
+
+    # ==========================================================
+    # OCR EXTRACTED TEXT
+    # ==========================================================
+
+    story.append(PageBreak())
+
+    story.append(
+        Paragraph(
+            "OCR Extracted Text",
+            heading_style
+        )
+    )
+
+    if ocr_text and ocr_text.strip():
+
+        safe_text = (
+            ocr_text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\n", "<br/>")
+        )
+
+        lines = safe_text.split("\n")
+
+        for line in lines:
+
+                story.append(
+                    Paragraph(line, normal_style)
+                )
+
+                story.append(
+                    Spacer(1, 2)
+                )
+
+    else:
+
+        empty_table = Table(
+            [[
+                Paragraph(
+                    "No OCR text could be extracted from the uploaded image.",
+                    normal_style
+                )
+            ]],
+            colWidths=[16.2 * cm]
+        )
+
+        empty_table.setStyle(
+
+            TableStyle([
+
+                ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
+
+                ("BOX", (0, 0), (-1, -1), 1, ORANGE),
+
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+
+                ("TOPPADDING", (0, 0), (-1, -1), 12),
+
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+
+            ])
+
+        )
+
+        story.append(empty_table)
+
+    story.append(Spacer(1, 20))
+
+    # ==========================================================
+    # REPORT FOOTER
+    # ==========================================================
+
+    story.append(Spacer(1, 20))
+
+    story.append(
+
+        HRFlowable(
+
+            width="100%",
+
+            thickness=1,
+
+            color=TEAL
+
+        )
+
+    )
+
+    story.append(Spacer(1, 8))
+
+    story.append(
+
+        Paragraph(
+
+            "OCR Readiness Evaluation Platform",
+
+            footer_style
+
+        )
+
+    )
+
+    story.append(
+
+        Paragraph(
+
+            "AI-Based OCR Image Quality Assessment System",
+
+            footer_style
+
+        )
+
+    )
+
+    story.append(
+
+        Paragraph(
+
+            "Developed under SNLP Internship Project",
+
+            footer_style
+
+        )
+
+    )
+
+    story.append(
+
+        Paragraph(
+
+            "© 2026 All Rights Reserved",
+
+            footer_style
+
+        )
+
+    )
+
+
+    # ==========================================================
+    # BUILD PDF
+    # ==========================================================
+
+    doc.build(
+
+        story,
+
+        onFirstPage=draw_footer,
+
+        onLaterPages=draw_footer
+
+    )
+
+    pdf = buffer.getvalue()
+
+    buffer.close()
+
+    return pdf
+
