@@ -579,17 +579,7 @@ if nav == "🏠 Analyse Image":
         """
         )
 
-        with st.container():
-            st.markdown("""
-            <div style="
-            background:#1B2435;
-            border:1px solid #2E3B55;
-            border-radius:18px;
-            padding:20px;
-            box-shadow:0px 6px 18px rgba(0,0,0,0.35);
-            ">
-            """, unsafe_allow_html=True)
-
+        with st.container(border=True):
             st.subheader("🚀 Ready to Analyse")
 
             st.write(
